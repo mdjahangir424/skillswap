@@ -8,8 +8,12 @@ import 'achievements_screen.dart';
 import 'learning_session_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final ValueChanged<int> onNavigate;
 
+  const HomeScreen({
+    super.key,
+    required this.onNavigate,
+  });
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
