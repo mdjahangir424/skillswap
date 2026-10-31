@@ -166,18 +166,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       color: Color(0xFF101828),
                     ),
                   ),
-                  Positioned(
-                    left: 8,
-                    child: IconButton(
-                      onPressed: () {
-                        Navigator.maybePop(context);
-                      },
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 19,
-                        color: Color(0xFF60749B),
-                      ),
-                    ),
                   ),
                 ],
               ),
