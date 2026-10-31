@@ -1,0 +1,39 @@
+
+name: Install SkillSwap Dependencies
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install-dependencies:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Check Flutter Version
+        run: flutter --version
+
+      - name: Install Flutter Packages
+        run: flutter pub get
+
+      - name: Commit Lock File
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pubspec.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "Install SkillSwap dependencies"
+            git push
+          else
+            echo "No lock file changes"
+          fi
