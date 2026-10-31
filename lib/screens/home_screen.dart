@@ -1,9 +1,6 @@
 
 import 'package:flutter/material.dart';
 
-import 'explore_screen.dart';
-import 'chat_screen.dart';
-import 'profile_screen.dart';
 import 'achievements_screen.dart';
 import 'learning_session_screen.dart';
 
@@ -14,6 +11,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.onNavigate,
   });
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -225,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Skill Partner',
                     const Color(0xFFEDE9FF),
                     purple,
-                    () => openScreen(const ExploreScreen()),
+                    () => widget.onNavigate(1),
                   ),
                   _actionCard(
                     Icons.add_circle,
@@ -233,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Your Skill',
                     const Color(0xFFE0F5F0),
                     const Color(0xFF0AA77A),
-                    () => openScreen(const ProfileScreen()),
+                    () => widget.onNavigate(3),
                   ),
                   _actionCard(
                     Icons.calendar_month,
@@ -268,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => openScreen(const ExploreScreen()),
+                    onPressed: () => widget.onNavigate(1),
                     child: const Text(
                       'See All →',
                       style: TextStyle(color: blue),
@@ -297,49 +295,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-      ),
-
-      // Bottom navigation
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              break;
-            case 1:
-              openScreen(const ExploreScreen());
-              break;
-            case 2:
-              openScreen(const ChatScreen());
-              break;
-            case 3:
-              openScreen(const ProfileScreen());
-              break;
-          }
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: blue,
-        unselectedItemColor: Colors.blueGrey,
-        selectedFontSize: 11,
-        unselectedFontSize: 11,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Explore',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Messages',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Profile',
-          ),
-        ],
       ),
     );
   }
