@@ -29,6 +29,9 @@ dependencies:
   # Firebase Cloud Messaging
   firebase_messaging: ^17.0.1
 
+  # Firebase Analytics
+  firebase_analytics: ^13.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
