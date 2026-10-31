@@ -1,169 +1,346 @@
+
 import 'package:flutter/material.dart';
-
-void main() => runApp(const MyApp());
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true),
-      home: const AchievementsScreen(),
-    );
-  }
-}
 
 class AchievementsScreen extends StatelessWidget {
   const AchievementsScreen({super.key});
 
+  static const Color primaryBlue = Color(0xFF075CF5);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FC),
+      backgroundColor: const Color(0xFFF8F9FD),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ---------- Title ----------
-              const Row(
+        child: Column(
+          children: [
+            // Header
+            const SizedBox(
+              height: 55,
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.emoji_events_outlined, size: 28),
+                  Icon(
+                    Icons.emoji_events_outlined,
+                    size: 25,
+                    color: Color(0xFF172033),
+                  ),
                   SizedBox(width: 8),
                   Text(
                     'Achievements',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // ---------- Top banner ----------
-              const _HeroBanner(),
-              const SizedBox(height: 24),
-
-              // ---------- Your Stats header ----------
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Your Stats',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(
-                    onPressed: () {},
-                    child: const Row(
-                      children: [
-                        Text('See All'),
-                        SizedBox(width: 4),
-                        Icon(Icons.arrow_forward, size: 16),
-                      ],
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF101828),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+            ),
 
-              // ---------- Stats grid (2 x 2) ----------
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.45,
-                children: const [
-                  StatCard(
-                    icon: Icons.menu_book_rounded,
-                    iconColor: Color(0xFF1E6FEB),
-                    value: '12',
-                    label: 'Courses',
-                  ),
-                  StatCard(
-                    icon: Icons.groups_rounded,
-                    iconColor: Color(0xFF2DA3F5),
-                    value: '482',
-                    label: 'Connections',
-                  ),
-                  StatCard(
-                    icon: Icons.local_fire_department_rounded,
-                    iconColor: Color(0xFFFF7A00),
-                    value: '28',
-                    label: 'Day Streak',
-                  ),
-                  StatCard(
-                    icon: Icons.star_rounded,
-                    iconColor: Color(0xFFFFB300),
-                    value: '4.8',
-                    label: 'Rating',
-                  ),
-                ],
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(21, 5, 21, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Achievement banner
+                    _achievementBanner(),
+
+                    const SizedBox(height: 14),
+
+                    // Stats heading
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Your Stats',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF101828),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            _showAllStats(context);
+                          },
+                          child: const Text(
+                            'See All →',
+                            style: TextStyle(
+                              color: Color(0xFF173B9A),
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 2),
+
+                    // Statistics grid
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 9,
+                      childAspectRatio: 1.75,
+                      children: const [
+                        _StatCard(
+                          icon: Icons.menu_book,
+                          iconColor: Color(0xFF1682F8),
+                          value: '12',
+                          label: 'Courses',
+                        ),
+                        _StatCard(
+                          icon: Icons.groups,
+                          iconColor: Color(0xFF1682F8),
+                          value: '482',
+                          label: 'Connections',
+                        ),
+                        _StatCard(
+                          icon: Icons.local_fire_department,
+                          iconColor: Color(0xFFFF791C),
+                          value: '28',
+                          label: 'Day Streak',
+                        ),
+                        _StatCard(
+                          icon: Icons.star,
+                          iconColor: Color(0xFFFFB323),
+                          value: '4.8',
+                          label: 'Rating',
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 13),
+
+                    // Next goal card
+                    _nextGoalCard(),
+
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-
-              // ---------- Next goal ----------
-              const _NextGoalCard(progress: 0.75),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
-}
 
-// =============== Banner ===============
-class _HeroBanner extends StatelessWidget {
-  const _HeroBanner();
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _achievementBanner() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      height: 157,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF3A2BA8), Color(0xFF5B3FD0)],
+          colors: [
+            Color(0xFF6336D8),
+            Color(0xFF29218D),
+          ],
         ),
+        borderRadius: BorderRadius.circular(21),
       ),
-      child: const Column(
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Icon(Icons.emoji_events_rounded, size: 96, color: Color(0xFFFFC107)),
-          SizedBox(height: 8),
-          Text(
-            "You're Awesome!",
-            style: TextStyle(
-              color: Color(0xFFFFD54F),
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+          const Positioned(
+            left: 40,
+            top: 55,
+            child: Icon(
+              Icons.star,
+              color: Color(0xFFFFD42A),
+              size: 18,
             ),
           ),
-          SizedBox(height: 4),
-          Text(
-            'Keep learning and growing!',
-            style: TextStyle(color: Colors.white, fontSize: 14),
+          const Positioned(
+            right: 40,
+            top: 62,
+            child: Icon(
+              Icons.star,
+              color: Color(0xFFFFD42A),
+              size: 18,
+            ),
+          ),
+          const Positioned(
+            left: 70,
+            top: 42,
+            child: Icon(
+              Icons.auto_awesome,
+              color: Color(0xFFFFD42A),
+              size: 12,
+            ),
+          ),
+          const Positioned(
+            right: 76,
+            top: 43,
+            child: Icon(
+              Icons.auto_awesome,
+              color: Color(0xFF33C8FF),
+              size: 13,
+            ),
+          ),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.emoji_events,
+                color: Color(0xFFFFC928),
+                size: 76,
+              ),
+              const SizedBox(height: 3),
+              const Text(
+                "You're Awesome!",
+                style: TextStyle(
+                  color: Color(0xFFFFD92E),
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                'Keep learning and growing!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
+  Widget _nextGoalCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 13),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF5834D6),
+            Color(0xFF172FAD),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Next Goal:',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Reach Expert Level',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.star,
+                color: Color(0xFFFFD42A),
+                size: 39,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: const LinearProgressIndicator(
+              value: 0.75,
+              minHeight: 10,
+              backgroundColor: Color(0xFF17247B),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Color(0xFFE9E9FF),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAllStats(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(22),
+        ),
+      ),
+      builder: (context) {
+        return const SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your Achievements',
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 18),
+                ListTile(
+                  leading: Icon(Icons.menu_book, color: Colors.blue),
+                  title: Text('12 Courses Completed'),
+                ),
+                ListTile(
+                  leading: Icon(Icons.groups, color: Colors.blue),
+                  title: Text('482 Connections'),
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.local_fire_department,
+                    color: Colors.orange,
+                  ),
+                  title: Text('28 Day Learning Streak'),
+                ),
+                ListTile(
+                  leading: Icon(Icons.star, color: Colors.amber),
+                  title: Text('4.8 Average Rating'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
-// =============== Reusable stat card ===============
-class StatCard extends StatelessWidget {
+class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final String value;
   final String label;
 
-  const StatCard({
-    super.key,
+  const _StatCard({
     required this.icon,
     required this.iconColor,
     required this.value,
@@ -174,75 +351,33 @@ class StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFE9EDF8),
-        borderRadius: BorderRadius.circular(18),
+        color: const Color(0xFFEDF1FB),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 32, color: iconColor),
-          const SizedBox(height: 4),
+          Icon(
+            icon,
+            color: iconColor,
+            size: 26,
+          ),
+          const SizedBox(height: 1),
           Text(
             value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          Text(label, style: const TextStyle(fontSize: 13)),
-        ],
-      ),
-    );
-  }
-}
-
-// =============== Next goal card ===============
-class _NextGoalCard extends StatelessWidget {
-  final double progress; // 0.0 - 1.0
-
-  const _NextGoalCard({required this.progress});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF3A2BA8), Color(0xFF5B3FD0)],
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Next Goal:',
-                  style: TextStyle(color: Colors.white, fontSize: 15),
-                ),
-                const Text(
-                  'Reach Expert Level',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 10,
-                    backgroundColor: Colors.white24,
-                    valueColor: const AlwaysStoppedAnimation(Colors.white),
-                  ),
-                ),
-              ],
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF101828),
             ),
           ),
-          const SizedBox(width: 16),
-          const Icon(Icons.star_rounded, size: 48, color: Color(0xFFFFC107)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF26354F),
+            ),
+          ),
         ],
       ),
     );
