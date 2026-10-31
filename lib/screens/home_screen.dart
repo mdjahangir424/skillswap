@@ -1,6 +1,12 @@
 
 import 'package:flutter/material.dart';
 
+import 'explore_screen.dart';
+import 'chat_screen.dart';
+import 'profile_screen.dart';
+import 'achievements_screen.dart';
+import 'learning_session_screen.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -9,10 +15,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int selectedIndex = 0;
-
   static const blue = Color(0xFF1558E8);
   static const purple = Color(0xFF6035D9);
+
+  void openScreen(Widget screen) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => screen),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -210,6 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Skill Partner',
                     const Color(0xFFEDE9FF),
                     purple,
+                    () => openScreen(const ExploreScreen()),
                   ),
                   _actionCard(
                     Icons.add_circle,
@@ -217,6 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Your Skill',
                     const Color(0xFFE0F5F0),
                     const Color(0xFF0AA77A),
+                    () => openScreen(const ProfileScreen()),
                   ),
                   _actionCard(
                     Icons.calendar_month,
@@ -224,6 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Session',
                     const Color(0xFFFFF0E5),
                     const Color(0xFFFF8A24),
+                    () => openScreen(const LearningSessionScreen()),
                   ),
                   _actionCard(
                     Icons.emoji_events,
@@ -231,6 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Achievements',
                     const Color(0xFFE8EEFF),
                     blue,
+                    () => openScreen(const AchievementsScreen()),
                   ),
                 ],
               ),
@@ -249,7 +264,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () => openScreen(const ExploreScreen()),
                     child: const Text(
                       'See All →',
                       style: TextStyle(color: blue),
@@ -263,11 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: _skillCard(
-                      '🇬🇧',
-                      'English',
-                      '(12k+)',
-                    ),
+                    child: _skillCard('🇬🇧', 'English', '(12k+)'),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -286,9 +297,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
       // Bottom navigation
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: selectedIndex,
+        currentIndex: 0,
         onTap: (index) {
-          setState(() => selectedIndex = index);
+          switch (index) {
+            case 0:
+              break;
+            case 1:
+              openScreen(const ExploreScreen());
+              break;
+            case 2:
+              openScreen(const ChatScreen());
+              break;
+            case 3:
+              openScreen(const ProfileScreen());
+              break;
+          }
         },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: blue,
@@ -323,26 +346,30 @@ class _HomeScreenState extends State<HomeScreen> {
     String second,
     Color background,
     Color iconColor,
+    VoidCallback onTap,
   ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(19),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 34, color: iconColor),
-          const SizedBox(height: 10),
-          Text(
-            first,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          Text(
-            second,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(19),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 34, color: iconColor),
+            const SizedBox(height: 10),
+            Text(
+              first,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            Text(
+              second,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
       ),
     );
   }
