@@ -14,7 +14,7 @@ class SplashScreen extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF073B91),
+              Color(0xFF073A91),
               Color(0xFF061B55),
               Color(0xFF073A91),
             ],
@@ -30,7 +30,7 @@ class SplashScreen extends StatelessWidget {
                     const LinearGradient(
                   colors: [
                     Color(0xFF00C8FF),
-                    Color(0xFF783BFF),
+                    Color(0xFF793BFF),
                   ],
                 ).createShader(bounds),
                 child: const Text(
@@ -44,7 +44,7 @@ class SplashScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
 
               RichText(
                 text: const TextSpan(
@@ -77,7 +77,7 @@ class SplashScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 28),
 
               const Text(
                 'A World of Skills,\nOne Community.',
@@ -93,7 +93,7 @@ class SplashScreen extends StatelessWidget {
 
               const Expanded(
                 flex: 3,
-                child: _GlobalNetwork(),
+                child: _GlobeNetwork(),
               ),
 
               Padding(
@@ -129,8 +129,6 @@ class SplashScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
-              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -139,79 +137,107 @@ class SplashScreen extends StatelessWidget {
   }
 }
 
-class _GlobalNetwork extends StatelessWidget {
-  const _GlobalNetwork();
+class _GlobeNetwork extends StatelessWidget {
+  const _GlobeNetwork();
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: _NetworkPainter(),
+      painter: _GlobePainter(),
       child: const SizedBox.expand(),
     );
   }
 }
 
-class _NetworkPainter extends CustomPainter {
+class _GlobePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height * 0.57);
-    final radius = size.width * 0.43;
+    final center = Offset(size.width / 2, size.height * 0.55);
+    final radius = size.width * 0.39;
 
-    final globePaint = Paint()
+    final glow = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFF16C9FF).withOpacity(0.35),
-          const Color(0xFF0878FF).withOpacity(0.08),
+          const Color(0xFF12BFFF).withOpacity(0.38),
+          const Color(0xFF0878FF).withOpacity(0.12),
           Colors.transparent,
         ],
       ).createShader(
-        Rect.fromCircle(center: center, radius: radius),
+        Rect.fromCircle(center: center, radius: radius * 1.4),
       );
 
+    canvas.drawCircle(center, radius * 1.4, glow);
+
+    final globePaint = Paint()
+      ..color = const Color(0xFF35CFFF).withOpacity(0.45)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+
+    // Globe outline
     canvas.drawCircle(center, radius, globePaint);
 
-    final linePaint = Paint()
-      ..color = const Color(0xFF44D7FF).withOpacity(0.45)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
+    // Longitude curves
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: center,
+        width: radius * 0.9,
+        height: radius * 2,
+      ),
+      globePaint,
+    );
+
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: center,
+        width: radius * 1.55,
+        height: radius * 2,
+      ),
+      globePaint,
+    );
+
+    // Latitude curves
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: center,
+        width: radius * 2,
+        height: radius * 0.65,
+      ),
+      globePaint,
+    );
 
     canvas.drawOval(
       Rect.fromCenter(
         center: center,
         width: radius * 2,
-        height: radius * 0.9,
+        height: radius * 1.35,
       ),
-      linePaint,
-    );
-
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: center,
-        width: radius * 1.3,
-        height: radius * 1.8,
-      ),
-      linePaint,
+      globePaint,
     );
 
     final points = [
-      Offset(size.width * 0.12, size.height * 0.50),
-      Offset(size.width * 0.28, size.height * 0.34),
-      Offset(size.width * 0.50, size.height * 0.27),
-      Offset(size.width * 0.74, size.height * 0.38),
-      Offset(size.width * 0.89, size.height * 0.53),
+      Offset(size.width * 0.12, size.height * 0.45),
+      Offset(size.width * 0.28, size.height * 0.29),
+      Offset(size.width * 0.49, size.height * 0.24),
+      Offset(size.width * 0.73, size.height * 0.33),
+      Offset(size.width * 0.88, size.height * 0.49),
       Offset(size.width * 0.30, size.height * 0.70),
-      Offset(size.width * 0.68, size.height * 0.72),
+      Offset(size.width * 0.70, size.height * 0.70),
     ];
 
     final connections = [
       [0, 1], [1, 2], [2, 3], [3, 4],
-      [0, 5], [5, 6], [6, 4], [1, 5], [3, 6],
+      [0, 5], [5, 6], [6, 4],
+      [1, 5], [3, 6],
     ];
 
-    for (final connection in connections) {
+    final linePaint = Paint()
+      ..color = const Color(0xFF45DFFF).withOpacity(0.65)
+      ..strokeWidth = 1.3;
+
+    for (final pair in connections) {
       canvas.drawLine(
-        points[connection[0]],
-        points[connection[1]],
+        points[pair[0]],
+        points[pair[1]],
         linePaint,
       );
     }
@@ -220,12 +246,45 @@ class _NetworkPainter extends CustomPainter {
       ..color = const Color(0xFF24D6FF);
 
     for (final point in points) {
-      canvas.drawCircle(point, 4, nodePaint);
       canvas.drawCircle(
         point,
-        8,
-        Paint()
-          ..color = const Color(0xFF24D6FF).withOpacity(0.18),
+        10,
+        Paint()..color = const Color(0xFF24D6FF).withOpacity(0.16),
+      );
+      canvas.drawCircle(point, 4, nodePaint);
+    }
+
+    // Small profile circles
+    final avatarPositions = [
+      Offset(size.width * 0.12, size.height * 0.45),
+      Offset(size.width * 0.82, size.height * 0.45),
+      Offset(size.width * 0.28, size.height * 0.29),
+      Offset(size.width * 0.70, size.height * 0.33),
+    ];
+
+    for (final point in avatarPositions) {
+      canvas.drawCircle(
+        point,
+        13,
+        Paint()..color = Colors.white,
+      );
+      canvas.drawCircle(
+        point,
+        10,
+        Paint()..color = const Color(0xFF9CCEFF),
+      );
+      canvas.drawCircle(
+        Offset(point.dx, point.dy - 2),
+        3.5,
+        Paint()..color = const Color(0xFF073A91),
+      );
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(point.dx, point.dy + 5),
+          width: 9,
+          height: 5,
+        ),
+        Paint()..color = const Color(0xFF073A91),
       );
     }
   }
