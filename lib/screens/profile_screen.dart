@@ -140,19 +140,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   Positioned(
-                    left: 8,
-                    child: IconButton(
-                      onPressed: () {
-                        Navigator.maybePop(context);
-                      },
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 19,
-                        color: Color(0xFF526B9A),
-                      ),
-                    ),
-                  ),
-                  Positioned(
                     right: 12,
                     child: IconButton(
                       onPressed: showSettings,
@@ -332,29 +319,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
-
-            // Bottom navigation
-            Container(
-              height: 62,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  top: BorderSide(
-                    color: Colors.grey.withOpacity(0.15),
-                  ),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _navItem(Icons.home_outlined, 'Home', false),
-                  _navItem(Icons.search, 'Explore', false),
-                  _navItem(Icons.forum_outlined, 'Messages', false,
-                      showBadge: true),
-                  _navItem(Icons.person, 'Profile', true),
-                ],
-              ),
-            ),
           ],
         ),
       ),
@@ -458,80 +422,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           );
         }).toList(),
-      ),
-    );
-  }
-
-  Widget _navItem(
-    IconData icon,
-    String label,
-    bool selected, {
-    bool showBadge = false,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        if (!selected) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$label navigation will be connected later.'),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        }
-      },
-      child: SizedBox(
-        width: 65,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  icon,
-                  size: 24,
-                  color: selected
-                      ? primaryBlue
-                      : const Color(0xFF7587AC),
-                ),
-                if (showBadge)
-                  Positioned(
-                    right: -8,
-                    top: -5,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Text(
-                        '3',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                color: selected
-                    ? primaryBlue
-                    : const Color(0xFF7587AC),
-                fontWeight:
-                    selected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
