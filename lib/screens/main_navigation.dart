@@ -18,15 +18,21 @@ class _MainNavigationState extends State<MainNavigation> {
 
   static const Color primaryBlue = Color(0xFF1558E8);
 
-  final List<Widget> screens = const [
-    HomeScreen(),
-    ExploreScreen(),
-    ChatScreen(),
-    ProfileScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final List<Widget> screens = [
+      HomeScreen(
+        onNavigate: (index) {
+          setState(() {
+            selectedIndex = index;
+          });
+        },
+      ),
+      const ExploreScreen(),
+      const ChatScreen(),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: selectedIndex,
