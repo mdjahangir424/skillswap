@@ -1,0 +1,34 @@
+name: Create SkillSwap Flutter Project
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-flutter:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Create Flutter Project
+        run: |
+          flutter create --org com.mdjahangir424 --project-name skillswap temp_app
+          cp -r temp_app/. .
+          rm -rf temp_app
+
+      - name: Commit Flutter Project
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Create SkillSwap Flutter project"
+          git push
