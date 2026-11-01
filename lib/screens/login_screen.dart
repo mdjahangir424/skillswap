@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'main_navigation.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -34,15 +33,8 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
-      if (!mounted) return;
-
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const MainNavigation(),
-        ),
-        (route) => false,
-      );
+      // AuthCheck in main.dart will automatically
+      // detect the login and open MainNavigation.
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
@@ -105,7 +97,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Password reset email sent. Please check your inbox.'),
+          content: Text(
+            'Password reset email sent. Please check your inbox.',
+          ),
         ),
       );
     } on FirebaseAuthException catch (e) {
@@ -194,11 +188,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (value == null || value.trim().isEmpty) {
                         return 'Please enter your email.';
                       }
+
                       if (!RegExp(
                         r'^[^@]+@[^@]+\.[^@]+$',
                       ).hasMatch(value.trim())) {
                         return 'Enter a valid email address.';
                       }
+
                       return null;
                     },
                   ),
@@ -240,6 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your password.';
                       }
+
                       return null;
                     },
                   ),
@@ -269,7 +266,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryBlue,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: primaryBlue.withOpacity(0.6),
+                        disabledBackgroundColor:
+                            primaryBlue.withOpacity(0.6),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
