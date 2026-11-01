@@ -1,8 +1,19 @@
 
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String conversationId;
+  final String otherUserId;
+  final String otherUserName;
+
+  const ChatScreen({
+    super.key,
+    required this.conversationId,
+    required this.otherUserId,
+    required this.otherUserName,
+  });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -14,34 +25,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   final ScrollController scrollController = ScrollController();
 
-  final List<Map<String, dynamic>> messages = [
-    {
-      'text': "Hi! I'd like to learn\nBangla. Can you help?",
-      'time': '9:15 AM',
-      'isMe': false,
-      'read': false,
-    },
-    {
-      'text': "Sure! Let's schedule\na session.",
-      'time': '9:16 AM',
-      'isMe': true,
-      'read': true,
-    },
-    {
-      'text': 'Great! How about\nthis Sunday?',
-      'time': '9:17 AM',
-      'isMe': false,
-      'read': false,
-    },
-    {
-      'text': 'Perfect! 👍',
-      'time': '9:18 AM',
-      'isMe': true,
-      'read': true,
-    },
-  ];
-
   final Color primaryBlue = const Color(0xFF075CF5);
+
+  bool isSending = false;
+
+  CollectionReference<Map<String, dynamic>> get messagesCollection =>
+      FirebaseFirestore.instance
+          .collection('conversations')
+          .doc(widget.conversationId)
+          .collection('messages');
 
   @override
   void dispose() {
@@ -50,31 +42,80 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void sendMessage() {
+  Future<void> sendMessage() async {
     final text = messageController.text.trim();
+    final currentUser = FirebaseAuth.instance.currentUser;
 
-    if (text.isEmpty) return;
+    if (text.isEmpty || currentUser == null || isSending) return;
+
+    if (text.length > 5000) {
+      showActionMessage('Message cannot exceed 5000 characters.');
+      return;
+    }
 
     setState(() {
-      messages.add({
-        'text': text,
-        'time': TimeOfDay.now().format(context),
-        'isMe': true,
-        'read': false,
-      });
+      isSending = true;
     });
 
     messageController.clear();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (scrollController.hasClients) {
-        scrollController.animateTo(
-          scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
+    try {
+      final conversationRef = FirebaseFirestore.instance
+          .collection('conversations')
+          .doc(widget.conversationId);
+
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final conversationSnapshot =
+            await transaction.get(conversationRef);
+
+        if (!conversationSnapshot.exists) {
+          throw Exception('Conversation not found.');
+        }
+
+        final participants = List<String>.from(
+          conversationSnapshot.data()?['participants'] ?? [],
         );
+
+        if (!participants.contains(currentUser.uid)) {
+          throw Exception('You are not a participant in this chat.');
+        }
+
+        final messageRef = messagesCollection.doc();
+
+        transaction.set(messageRef, {
+          'senderId': currentUser.uid,
+          'text': text,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        transaction.update(conversationRef, {
+          'lastMessage': text,
+          'lastMessageSenderId': currentUser.uid,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (scrollController.hasClients) {
+          scrollController.animateTo(
+            scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        messageController.text = text;
+        showActionMessage('Message failed to send. Please try again.');
       }
-    });
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSending = false;
+        });
+      }
+    }
   }
 
   void showActionMessage(String message) {
@@ -86,8 +127,27 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  String formatTime(Timestamp? timestamp) {
+    if (timestamp == null) return '';
+
+    final date = timestamp.toDate();
+    final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = date.hour >= 12 ? 'PM' : 'AM';
+
+    return '$hour:$minute $period';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(child: Text('Please log in to continue.')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFF),
       body: SafeArea(
@@ -100,65 +160,44 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: const BoxDecoration(
                 color: Colors.white,
                 border: Border(
-                  bottom: BorderSide(
-                    color: Color(0xFFE9EDF5),
-                  ),
+                  bottom: BorderSide(color: Color(0xFFE9EDF5)),
                 ),
               ),
               child: Row(
                 children: [
-                  ClipOval(
-                    child: Image.network(
-                      'https://randomuser.me/api/portraits/men/32.jpg',
-                      width: 43,
-                      height: 43,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const CircleAvatar(
-                          radius: 21,
-                          child: Icon(Icons.person),
-                        );
-                      },
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Color(0xFF172033),
                     ),
                   ),
-
+                  CircleAvatar(
+                    radius: 21,
+                    backgroundColor: const Color(0xFFE8F0FF),
+                    child: Text(
+                      widget.otherUserName.isNotEmpty
+                          ? widget.otherUserName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        color: Color(0xFF1558E8),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                   const SizedBox(width: 10),
-
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'John Smith',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF172033),
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        const Row(
-                          children: [
-                            Icon(
-                              Icons.circle,
-                              size: 8,
-                              color: Color(0xFF15BD75),
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Online',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF15BD75),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    child: Text(
+                      widget.otherUserName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF172033),
+                      ),
                     ),
                   ),
-
                   IconButton(
                     onPressed: () {
                       showActionMessage(
@@ -171,7 +210,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       size: 23,
                     ),
                   ),
-
                   IconButton(
                     onPressed: () {
                       showActionMessage(
@@ -188,20 +226,68 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
 
-            // Messages
+            // Real-time Messages
             Expanded(
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                children: [
-                  ...messages.map((message) {
-                    return _messageBubble(message);
-                  }),
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: messagesCollection
+                    .orderBy('createdAt', descending: false)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: Text('Unable to load messages.'),
+                    );
+                  }
 
-                  const SizedBox(height: 12),
+                  if (snapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: Color(0xFF1558E8),
+                      ),
+                    );
+                  }
 
-                  _learningSessionCard(),
-                ],
+                  final messages = snapshot.data?.docs ?? [];
+
+                  if (messages.isEmpty) {
+                    return const Center(
+                      child: Text(
+                        'Say hello and start learning together!',
+                        style: TextStyle(
+                          color: Color(0xFF71809B),
+                          fontSize: 13,
+                        ),
+                      ),
+                    );
+                  }
+
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (scrollController.hasClients) {
+                      scrollController.jumpTo(
+                        scrollController.position.maxScrollExtent,
+                      );
+                    }
+                  });
+
+                  return ListView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    itemCount: messages.length,
+                    itemBuilder: (context, index) {
+                      final data = messages[index].data();
+
+                      final isMe =
+                          data['senderId'] == currentUser.uid;
+
+                      return _messageBubble(
+                        text: data['text']?.toString() ?? '',
+                        time: formatTime(data['createdAt'] as Timestamp?),
+                        isMe: isMe,
+                      );
+                    },
+                  );
+                },
               ),
             ),
 
@@ -215,9 +301,7 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: const BoxDecoration(
                 color: Colors.white,
                 border: Border(
-                  top: BorderSide(
-                    color: Color(0xFFE9EDF5),
-                  ),
+                  top: BorderSide(color: Color(0xFFE9EDF5)),
                 ),
               ),
               child: Row(
@@ -234,7 +318,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       size: 24,
                     ),
                   ),
-
                   Expanded(
                     child: Container(
                       height: 40,
@@ -244,8 +327,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       child: TextField(
                         controller: messageController,
+                        maxLength: 5000,
                         onSubmitted: (_) => sendMessage(),
                         decoration: const InputDecoration(
+                          counterText: '',
                           hintText: 'Type a message...',
                           hintStyle: TextStyle(
                             color: Color(0xFF71809B),
@@ -260,11 +345,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                   ),
-
                   const SizedBox(width: 8),
-
                   GestureDetector(
-                    onTap: sendMessage,
+                    onTap: isSending ? null : sendMessage,
                     child: Container(
                       height: 39,
                       width: 39,
@@ -272,11 +355,19 @@ class _ChatScreenState extends State<ChatScreen> {
                         color: primaryBlue,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.send,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                      child: isSending
+                          ? const Padding(
+                              padding: EdgeInsets.all(10),
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.send,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                     ),
                   ),
                 ],
@@ -288,9 +379,11 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _messageBubble(Map<String, dynamic> message) {
-    final bool isMe = message['isMe'] as bool;
-
+  Widget _messageBubble({
+    required String text,
+    required String time,
+    required bool isMe,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
@@ -320,7 +413,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               child: Text(
-                message['text'],
+                text,
                 style: TextStyle(
                   color: isMe
                       ? Colors.white
@@ -332,117 +425,12 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 4),
-
-          Row(
-            mainAxisAlignment:
-                isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-            children: [
-              Text(
-                message['time'],
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Color(0xFF71809B),
-                ),
-              ),
-              if (isMe) ...[
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.done_all,
-                  size: 14,
-                  color: message['read'] == true
-                      ? const Color(0xFF1D8CFF)
-                      : const Color(0xFF71809B),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _learningSessionCard() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 15),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEEF2FC),
-        borderRadius: BorderRadius.circular(17),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                height: 43,
-                width: 43,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE0EAFE),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: Icon(
-                  Icons.calendar_month,
-                  color: primaryBlue,
-                  size: 28,
-                ),
-              ),
-
-              const SizedBox(width: 11),
-
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Learning Session',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF172033),
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Sun, Apr 27, 2025 • 7:00 PM',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF26354F),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 10),
-
-          SizedBox(
-            width: double.infinity,
-            height: 34,
-            child: ElevatedButton(
-              onPressed: () {
-                showActionMessage(
-                  'Session confirmation will be connected later.',
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryBlue,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Confirm',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+          Text(
+            time,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xFF71809B),
             ),
           ),
         ],
