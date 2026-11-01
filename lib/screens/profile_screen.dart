@@ -21,14 +21,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .doc(currentUser!.uid);
   }
 
-  Future<void> showEditDialog(
-    String title,
-    List<String> items,
-    String fieldName,
-  ) async {
-    final controller = TextEditingController();
+ 
+Future<void> showEditDialog(
+  String title,
+  List<String> items,
+  String fieldName,
+) async {
+  final controller = TextEditingController();
 
-    await showDialog(
+  String? newValue;
+
+  try {
+    newValue = await showDialog<String>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -38,7 +42,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                items.isEmpty ? 'No items added yet.' : items.join(', '),
+                items.isEmpty
+                    ? 'No items added yet.'
+                    : items.join(', '),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -52,34 +58,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () async {
+              onPressed: () {
                 final value = controller.text.trim();
 
-                if (value.isEmpty) return;
-
-                Navigator.pop(dialogContext);
-
-                try {
-                  await _userDocument.set({
-                    fieldName: FieldValue.arrayUnion([value]),
-                    'updatedAt': FieldValue.serverTimestamp(),
-                  }, SetOptions(merge: true));
-                } catch (e) {
-                  if (!mounted) return;
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Could not save. Please try again.',
-                      ),
-                    ),
-                  );
+                if (value.isNotEmpty) {
+                  Navigator.pop(dialogContext, value);
                 }
               },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  } finally {
+    controller.dispose();
+  }
+
+  if (newValue == null || newValue!.isEmpty) return;
+
+  try {
+    await _userDocument.set({
+      fieldName: FieldValue.arrayUnion([newValue]),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Could not save. Please try again.'),
+      ),
+    );
+  }
+}
+
               child: const Text('Add'),
             ),
           ],
