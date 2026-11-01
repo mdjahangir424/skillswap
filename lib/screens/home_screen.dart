@@ -9,7 +9,7 @@ class HomeScreen extends StatefulWidget {
 
   const HomeScreen({
     super.key,
-    this.onNavigate,
+    required this.onNavigate,
   });
 
   @override
