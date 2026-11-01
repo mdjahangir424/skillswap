@@ -1,7 +1,11 @@
 
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,6 +16,9 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final Color primaryBlue = const Color(0xFF075CF5);
+  final ImagePicker _imagePicker = ImagePicker();
+
+  bool _isUploadingPhoto = false;
 
   User? get currentUser => FirebaseAuth.instance.currentUser;
 
@@ -19,6 +26,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return FirebaseFirestore.instance
         .collection('users')
         .doc(currentUser!.uid);
+  }
+
+  // Upload Profile Photo
+  Future<void> _uploadProfilePhoto() async {
+    if (currentUser == null || _isUploadingPhoto) return;
+
+    try {
+      final XFile? selectedImage = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1200,
+      );
+
+      if (selectedImage == null) return;
+
+      if (!mounted) return;
+
+      setState(() {
+        _isUploadingPhoto = true;
+      });
+
+      final Uint8List imageBytes = await selectedImage.readAsBytes();
+
+      final String fileName =
+          'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      final Reference storageReference = FirebaseStorage.instance
+          .ref()
+          .child('users')
+          .child(currentUser!.uid)
+          .child(fileName);
+
+      await storageReference.putData(
+        imageBytes,
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
+
+      final String downloadUrl =
+          await storageReference.getDownloadURL();
+
+      await _userDocument.set({
+        'photoUrl': downloadUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile photo updated successfully!'),
+        ),
+      );
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Firebase error: ${e.message ?? e.code}',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not upload photo: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingPhoto = false;
+        });
+      }
+    }
   }
 
   // Edit Profile
@@ -52,7 +136,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       if (newName.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Name cannot be empty.')),
+          const SnackBar(
+            content: Text('Name cannot be empty.'),
+          ),
         );
         return;
       }
@@ -74,13 +160,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } on FirebaseException catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Firebase error: ${e.message ?? e.code}')),
+        SnackBar(
+          content: Text('Firebase error: ${e.message ?? e.code}'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not update profile: $e')),
+        SnackBar(
+          content: Text('Could not update profile: $e'),
+        ),
       );
     }
   }
@@ -114,15 +206,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Successfully added!')),
+        const SnackBar(
+          content: Text('Successfully added!'),
+        ),
       );
     } on FirebaseException catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Firebase error: ${e.message ?? e.code}')),
+        SnackBar(
+          content: Text('Firebase error: ${e.message ?? e.code}'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not save: $e')),
       );
@@ -161,10 +259,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final fieldName =
           isLearning ? 'skillsWanted' : 'skillsOffered';
 
-      await _userDocument.update({
+      await _userDocument.set({
         fieldName: FieldValue.arrayRemove([item]),
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
 
       if (!mounted) return;
 
@@ -175,13 +273,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } on FirebaseException catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Firebase error: ${e.message ?? e.code}')),
+        SnackBar(
+          content: Text('Firebase error: ${e.message ?? e.code}'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete skill: $e')),
+        SnackBar(
+          content: Text('Could not delete skill: $e'),
+        ),
       );
     }
   }
@@ -259,7 +363,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (snapshot.hasError) {
           return const Scaffold(
             body: Center(
-              child: Text('Unable to load profile. Please try again.'),
+              child: Text(
+                'Unable to load profile. Please try again.',
+              ),
             ),
           );
         }
@@ -361,7 +467,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ? Image.network(
                                         photoUrl,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
                                           return _defaultAvatar();
                                         },
                                       )
@@ -372,15 +479,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               right: 0,
                               bottom: 4,
                               child: GestureDetector(
-                                onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Profile photo upload will be connected later.',
-                                      ),
-                                    ),
-                                  );
-                                },
+                                onTap: _isUploadingPhoto
+                                    ? null
+                                    : _uploadProfilePhoto,
                                 child: Container(
                                   width: 35,
                                   height: 35,
@@ -392,11 +493,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       width: 2,
                                     ),
                                   ),
-                                  child: const Icon(
-                                    Icons.camera_alt_outlined,
-                                    color: Colors.white,
-                                    size: 19,
-                                  ),
+                                  child: _isUploadingPhoto
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(8),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.camera_alt_outlined,
+                                          color: Colors.white,
+                                          size: 19,
+                                        ),
                                 ),
                               ),
                             ),
