@@ -13,7 +13,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final Color primaryBlue = const Color(0xFF075CF5);
 
-  final User? currentUser = FirebaseAuth.instance.currentUser;
+  User? get currentUser => FirebaseAuth.instance.currentUser;
 
   DocumentReference<Map<String, dynamic>> get _userDocument {
     return FirebaseFirestore.instance
@@ -27,59 +27,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     List<String> items,
     String fieldName,
   ) async {
-    final controller = TextEditingController();
-    String? newValue;
+    if (currentUser == null) return;
 
-    try {
-      newValue = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            title: Text('Edit $title'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  items.isEmpty
-                      ? 'No items added yet.'
-                      : items.join(', '),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter a new item',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext);
-                },
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final value = controller.text.trim();
-
-                  if (value.isNotEmpty) {
-                    Navigator.pop(dialogContext, value);
-                  }
-                },
-                child: const Text('Add'),
-              ),
-            ],
-          );
-        },
-      );
-    } finally {
-      controller.dispose();
-    }
+    final newValue = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return _AddSkillDialog(
+          title: title,
+          items: items,
+        );
+      },
+    );
 
     if (!mounted || newValue == null || newValue.trim().isEmpty) {
       return;
@@ -98,12 +56,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
           content: Text('Successfully added!'),
         ),
       );
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Firebase error: ${e.message ?? e.code}'),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not save. Please try again.'),
+        SnackBar(
+          content: Text('Could not save: $e'),
         ),
       );
     }
@@ -158,7 +124,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Convert Firestore list into String list
   List<String> _getStringList(dynamic value) {
     if (value is List) {
       return value.whereType<String>().toList();
@@ -266,9 +231,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(
-                      21, 8, 21, 20,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(21, 8, 21, 20),
                     child: Column(
                       children: [
                         // Profile Photo
@@ -303,8 +266,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               bottom: 4,
                               child: GestureDetector(
                                 onTap: () {
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(
+                                  ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text(
                                         'Profile photo upload will be connected later.',
@@ -317,8 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   height: 35,
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF0BAA65),
-                                    borderRadius:
-                                        BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: Colors.white,
                                       width: 2,
@@ -337,7 +298,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                         const SizedBox(height: 10),
 
-                        // Name
                         Text(
                           name,
                           textAlign: TextAlign.center,
@@ -353,10 +313,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              '🇧🇩',
-                              style: TextStyle(fontSize: 15),
-                            ),
+                            Text('🇧🇩', style: TextStyle(fontSize: 15)),
                             SizedBox(width: 6),
                             Text(
                               'Bangladesh',
@@ -370,7 +327,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                         const SizedBox(height: 5),
 
-                        // Email
                         Text(
                           email,
                           textAlign: TextAlign.center,
@@ -382,7 +338,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                         const SizedBox(height: 13),
 
-                        // Bio
                         Text(
                           bio,
                           textAlign: TextAlign.center,
@@ -461,7 +416,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Default Avatar
   Widget _defaultAvatar() {
     return Container(
       color: const Color(0xFFDDE8F0),
@@ -473,7 +427,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Statistics Card
   Widget _statCard({
     required IconData icon,
     required Color iconColor,
@@ -511,7 +464,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Section Header
   Widget _sectionHeader(
     String title, {
     required VoidCallback onEdit,
@@ -542,7 +494,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Skills Chips
   Widget _buildChips(List<String> items, bool isLearning) {
     if (items.isEmpty) {
       return const Align(
@@ -587,6 +538,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         }).toList(),
       ),
+    );
+  }
+}
+
+// Separate Dialog Widget
+class _AddSkillDialog extends StatefulWidget {
+  final String title;
+  final List<String> items;
+
+  const _AddSkillDialog({
+    required this.title,
+    required this.items,
+  });
+
+  @override
+  State<_AddSkillDialog> createState() => _AddSkillDialogState();
+}
+
+class _AddSkillDialogState extends State<_AddSkillDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Edit ${widget.title}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.items.isEmpty
+                ? 'No items added yet.'
+                : widget.items.join(', '),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Enter a new item',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final value = _controller.text.trim();
+
+            if (value.isNotEmpty) {
+              Navigator.of(context).pop(value);
+            }
+          },
+          child: const Text('Add'),
+        ),
+      ],
     );
   }
 }
