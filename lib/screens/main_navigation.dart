@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'home_screen.dart';
 import 'explore_screen.dart';
-import 'chat_screen.dart';
+import 'messages_screen.dart';
 import 'profile_screen.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -29,7 +29,7 @@ class _MainNavigationState extends State<MainNavigation> {
         },
       ),
       const ExploreScreen(),
-      const ChatScreen(),
+      const MessagesScreen(),
       const ProfileScreen(),
     ];
 
