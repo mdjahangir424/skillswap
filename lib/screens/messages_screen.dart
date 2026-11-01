@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'chat_screen.dart';
+
 class MessagesScreen extends StatelessWidget {
   const MessagesScreen({super.key});
-
-  static const Color primaryBlue = Color(0xFF1558E8);
 
   @override
   Widget build(BuildContext context) {
@@ -15,183 +15,135 @@ class MessagesScreen extends StatelessWidget {
     if (currentUser == null) {
       return const Scaffold(
         body: Center(
-          child: Text('Please log in to view messages.'),
+          child: Text('Please login to view messages.'),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              height: 72,
-              width: double.infinity,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(
-                    color: Color(0xFFE9EDF5),
-                  ),
-                ),
-              ),
-              child: const Text(
-                'Messages',
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF101828),
-                ),
-              ),
-            ),
-
-            Expanded(
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collection('conversations')
-                    .where(
-                      'participants',
-                      arrayContains: currentUser.uid,
-                    )
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          'Unable to load conversations.\nPlease check your connection and security rules.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Color(0xFF667085),
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-
-                  if (snapshot.connectionState ==
-                          ConnectionState.waiting &&
-                      !snapshot.hasData) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: primaryBlue,
-                      ),
-                    );
-                  }
-
-                  final conversations = snapshot.data?.docs ?? [];
-
-                  conversations.sort((a, b) {
-                    final aTime = a.data()['updatedAt'] as Timestamp?;
-                    final bTime = b.data()['updatedAt'] as Timestamp?;
-
-                    return (bTime?.millisecondsSinceEpoch ?? 0)
-                        .compareTo(
-                      aTime?.millisecondsSinceEpoch ?? 0,
-                    );
-                  });
-
-                  if (conversations.isEmpty) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(30),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              height: 75,
-                              width: 75,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFE8F0FF),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.chat_bubble_outline,
-                                size: 35,
-                                color: primaryBlue,
-                              ),
-                            ),
-                            const SizedBox(height: 18),
-                            const Text(
-                              'No messages yet',
-                              style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF101828),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Connect with people in Explore to start a conversation.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF667085),
-                                height: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: conversations.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final conversation = conversations[index];
-                      final data = conversation.data();
-
-                      final participants =
-                          List<String>.from(
-                        data['participants'] ?? [],
-                      );
-
-                      final otherUserId = participants.firstWhere(
-                        (id) => id != currentUser.uid,
-                        orElse: () => '',
-                      );
-
-                      if (otherUserId.isEmpty) {
-                        return const SizedBox.shrink();
-                      }
-
-                      return _ConversationTile(
-                        otherUserId: otherUserId,
-                        lastMessage:
-                            data['lastMessage']?.toString() ?? '',
-                        updatedAt: data['updatedAt'] as Timestamp?,
-                        conversationId: conversation.id,
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
+      backgroundColor: const Color(0xFFF7F9FC),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Messages',
+          style: TextStyle(
+            color: Color(0xFF172B4D),
+            fontWeight: FontWeight.bold,
+          ),
         ),
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('conversations')
+            .where(
+              'participants',
+              arrayContains: currentUser.uid,
+            )
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text('Unable to load conversations.'),
+            );
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF1558E8),
+              ),
+            );
+          }
+
+          final conversations = snapshot.data?.docs ?? [];
+
+          if (conversations.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    size: 55,
+                    color: Colors.blueGrey,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'No conversations yet',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 6),
+                  Text(
+                    'Connect with someone to start chatting.',
+                    style: TextStyle(color: Colors.blueGrey),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          conversations.sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+
+            final aTime = aData['updatedAt'] as Timestamp?;
+            final bTime = bData['updatedAt'] as Timestamp?;
+
+            return (bTime?.millisecondsSinceEpoch ?? 0)
+                .compareTo(aTime?.millisecondsSinceEpoch ?? 0);
+          });
+
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: conversations.length,
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final conversation = conversations[index];
+              final data =
+                  conversation.data() as Map<String, dynamic>;
+
+              final participants =
+                  List<String>.from(data['participants'] ?? []);
+
+              final otherUserId = participants.firstWhere(
+                (id) => id != currentUser.uid,
+                orElse: () => '',
+              );
+
+              if (otherUserId.isEmpty) {
+                return const SizedBox.shrink();
+              }
+
+              return _ConversationTile(
+                conversationId: conversation.id,
+                otherUserId: otherUserId,
+                lastMessage: data['lastMessage'] ?? '',
+                updatedAt: data['updatedAt'] as Timestamp?,
+              );
+            },
+          );
+        },
       ),
     );
   }
 }
 
 class _ConversationTile extends StatelessWidget {
+  final String conversationId;
   final String otherUserId;
   final String lastMessage;
   final Timestamp? updatedAt;
-  final String conversationId;
 
   const _ConversationTile({
+    required this.conversationId,
     required this.otherUserId,
     required this.lastMessage,
     required this.updatedAt,
-    required this.conversationId,
   });
 
   String _formatTime(Timestamp? timestamp) {
@@ -215,81 +167,83 @@ class _ConversationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+    return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance
           .collection('users')
           .doc(otherUserId)
           .get(),
       builder: (context, snapshot) {
-        final userData = snapshot.data?.data();
-
-        final name = userData?['name']?.toString() ??
-            'SkillSwap User';
-
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: const Color(0xFFEAECF0),
-            ),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 7,
-            ),
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const ListTile(
             leading: CircleAvatar(
-              radius: 25,
-              backgroundColor: const Color(0xFFE8F0FF),
-              child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  color: Color(0xFF1558E8),
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              backgroundColor: Color(0xFFE8EEFF),
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            title: Text(
-              name,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF101828),
-              ),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Text(
-                lastMessage.isEmpty
-                    ? 'Start a conversation'
-                    : lastMessage,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF667085),
-                ),
-              ),
-            ),
-            trailing: Text(
-              _formatTime(updatedAt),
-              style: const TextStyle(
-                fontSize: 10,
-                color: Color(0xFF667085),
-              ),
-            ),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Chat screen connection is coming in the next step.',
-                  ),
-                ),
-              );
-            },
+            title: Text('Loading...'),
+          );
+        }
+
+        final userData = snapshot.data?.data()
+            as Map<String, dynamic>?;
+
+        final name = userData?['name']?.toString() ?? 'SkillSwap User';
+        final initial = name.isNotEmpty
+            ? name[0].toUpperCase()
+            : 'U';
+
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: 7,
           ),
+          leading: CircleAvatar(
+            radius: 26,
+            backgroundColor: const Color(0xFFE8EEFF),
+            child: Text(
+              initial,
+              style: const TextStyle(
+                color: Color(0xFF1558E8),
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+              ),
+            ),
+          ),
+          title: Text(
+            name,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+              color: Color(0xFF172B4D),
+            ),
+          ),
+          subtitle: Text(
+            lastMessage.isEmpty ? 'Start a conversation' : lastMessage,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.blueGrey,
+              fontSize: 13,
+            ),
+          ),
+          trailing: Text(
+            _formatTime(updatedAt),
+            style: const TextStyle(
+              color: Colors.blueGrey,
+              fontSize: 11,
+            ),
+          ),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(
+                  conversationId: conversationId,
+                  otherUserId: otherUserId,
+                  otherUserName: name,
+                ),
+              ),
+            );
+          },
         );
       },
     );
