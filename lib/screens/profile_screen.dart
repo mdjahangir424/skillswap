@@ -21,6 +21,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .doc(currentUser!.uid);
   }
 
+  // Edit Profile
+  Future<void> _editProfile() async {
+    if (currentUser == null) return;
+
+    try {
+      final snapshot = await _userDocument.get();
+      final data = snapshot.data() ?? {};
+
+      final name = (data['name'] as String?) ??
+          currentUser!.displayName ??
+          '';
+
+      final bio = (data['bio'] as String?) ?? '';
+
+      if (!mounted) return;
+
+      final result = await showDialog<Map<String, String>>(
+        context: context,
+        builder: (context) {
+          return _EditProfileDialog(
+            initialName: name,
+            initialBio: bio,
+          );
+        },
+      );
+
+      if (!mounted || result == null) return;
+
+      final newName = result['name']!.trim();
+      final newBio = result['bio']!.trim();
+
+      if (newName.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Name cannot be empty.')),
+        );
+        return;
+      }
+
+      await _userDocument.set({
+        'name': newName,
+        'bio': newBio,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await currentUser!.updateDisplayName(newName);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile updated successfully!'),
+        ),
+      );
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Firebase error: ${e.message ?? e.code}'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update profile: $e')),
+      );
+    }
+  }
+
   // Add Skills and Learning Goals
   Future<void> showEditDialog(
     String title,
@@ -52,9 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Successfully added!'),
-        ),
+        const SnackBar(content: Text('Successfully added!')),
       );
     } on FirebaseException catch (e) {
       if (!mounted) return;
@@ -68,9 +136,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not save: $e'),
-        ),
+        SnackBar(content: Text('Could not save: $e')),
       );
     }
   }
@@ -85,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           top: Radius.circular(24),
         ),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(22),
@@ -104,17 +170,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ListTile(
                   leading: const Icon(Icons.person_outline),
                   title: const Text('Account Settings'),
-                  onTap: () => Navigator.pop(context),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _editProfile();
+                  },
                 ),
                 ListTile(
                   leading: const Icon(Icons.notifications_none),
                   title: const Text('Notifications'),
-                  onTap: () => Navigator.pop(context),
+                  onTap: () => Navigator.pop(sheetContext),
                 ),
                 ListTile(
                   leading: const Icon(Icons.lock_outline),
                   title: const Text('Privacy & Security'),
-                  onTap: () => Navigator.pop(context),
+                  onTap: () => Navigator.pop(sheetContext),
                 ),
               ],
             ),
@@ -542,7 +611,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// Separate Dialog Widget
+// Add Skills Dialog
 class _AddSkillDialog extends StatefulWidget {
   final String title;
   final List<String> items;
@@ -597,9 +666,7 @@ class _AddSkillDialogState extends State<_AddSkillDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
@@ -611,6 +678,86 @@ class _AddSkillDialogState extends State<_AddSkillDialog> {
             }
           },
           child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+
+// Edit Profile Dialog
+class _EditProfileDialog extends StatefulWidget {
+  final String initialName;
+  final String initialBio;
+
+  const _EditProfileDialog({
+    required this.initialName,
+    required this.initialBio,
+  });
+
+  @override
+  State<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends State<_EditProfileDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _bioController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName);
+    _bioController = TextEditingController(text: widget.initialBio);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _bioController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Profile'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Full Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _bioController,
+              maxLines: 4,
+              maxLength: 200,
+              decoration: const InputDecoration(
+                labelText: 'Bio',
+                hintText: 'Tell others about yourself...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context, {
+              'name': _nameController.text,
+              'bio': _bioController.text,
+            });
+          },
+          child: const Text('Save'),
         ),
       ],
     );
