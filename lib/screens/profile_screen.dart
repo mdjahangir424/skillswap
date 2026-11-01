@@ -1,4 +1,7 @@
+
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -10,30 +13,33 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final Color primaryBlue = const Color(0xFF075CF5);
 
-  final List<String> skills = [
-    'Video Editing',
-    'Programming',
-    'English',
-    'Digital Marketing',
-  ];
+  final User? currentUser = FirebaseAuth.instance.currentUser;
 
-  final List<String> learningGoals = [
-    'AI & Machine Learning',
-    'Data Science',
-  ];
+  DocumentReference<Map<String, dynamic>> get _userDocument {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUser!.uid);
+  }
 
-  void showEditDialog(String title, List<String> items) {
+  Future<void> showEditDialog(
+    String title,
+    List<String> items,
+    String fieldName,
+  ) async {
     final controller = TextEditingController();
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
           title: Text('Edit $title'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(items.join(', ')),
+              Text(
+                items.isEmpty ? 'No items added yet.' : items.join(', '),
+              ),
               const SizedBox(height: 16),
               TextField(
                 controller: controller,
@@ -50,17 +56,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final value = controller.text.trim();
 
-                if (value.isNotEmpty) {
-                  setState(() {
-                    items.add(value);
-                  });
-                }
+                if (value.isEmpty) return;
 
                 Navigator.pop(dialogContext);
-                controller.dispose();
+
+                try {
+                  await _userDocument.set({
+                    fieldName: FieldValue.arrayUnion([value]),
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
+                } catch (e) {
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Could not save. Please try again.',
+                      ),
+                    ),
+                  );
+                }
               },
               child: const Text('Add'),
             ),
@@ -68,6 +86,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+
+    controller.dispose();
   }
 
   void showSettings() {
@@ -118,208 +138,297 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  List<String> _getStringList(dynamic value) {
+    if (value is List) {
+      return value.whereType<String>().toList();
+    }
+    return [];
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FD),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            SizedBox(
-              height: 52,
-              child: Row(
-                children: [
-                  const SizedBox(width: 48),
-                  const Expanded(
-                    child: Center(
-                      child: Text(
-                        'My Profile',
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF101828),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 48,
-                    child: IconButton(
-                      onPressed: showSettings,
-                      icon: Icon(
-                        Icons.settings_outlined,
-                        color: primaryBlue,
-                        size: 25,
-                      ),
-                    ),
-                  ),
-                ],
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('Please login to view your profile.'),
+        ),
+      );
+    }
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _userDocument.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Scaffold(
+            body: Center(
+              child: Text('Unable to load profile. Please try again.'),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Scaffold(
+            backgroundColor: Color(0xFFF8F9FD),
+            body: Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFF075CF5),
               ),
             ),
+          );
+        }
 
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(21, 8, 21, 20),
-                child: Column(
-                  children: [
-                    Stack(
-                      children: [
-                        Container(
-                          width: 116,
-                          height: 116,
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFF9FC4D2),
-                              width: 2,
-                            ),
-                          ),
-                          child: ClipOval(
-                            child: Image.network(
-                              'https://randomuser.me/api/portraits/men/75.jpg',
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: const Color(0xFFDDE8F0),
-                                  child: const Icon(
-                                    Icons.person,
-                                    size: 70,
-                                    color: Color(0xFF8092A8),
-                                  ),
-                                );
-                              },
+        final data = snapshot.data?.data() ?? {};
+
+        final String name =
+            (data['name'] as String?) ??
+            currentUser!.displayName ??
+            'SkillSwap User';
+
+        final String email =
+            (data['email'] as String?) ?? currentUser!.email ?? '';
+
+        final String bio =
+            (data['bio'] as String?) ??
+            'Passionate about learning\nand sharing skills with the world.';
+
+        final String photoUrl =
+            (data['photoUrl'] as String?) ?? '';
+
+        final List<String> skills =
+            _getStringList(data['skillsOffered']);
+
+        final List<String> learningGoals =
+            _getStringList(data['skillsWanted']);
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8F9FD),
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Header
+                SizedBox(
+                  height: 52,
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 48),
+                      const Expanded(
+                        child: Center(
+                          child: Text(
+                            'My Profile',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF101828),
                             ),
                           ),
                         ),
-                        Positioned(
-                          right: 0,
-                          bottom: 4,
-                          child: GestureDetector(
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Profile photo upload will be connected later.',
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              width: 35,
-                              height: 35,
+                      ),
+                      SizedBox(
+                        width: 48,
+                        child: IconButton(
+                          onPressed: showSettings,
+                          icon: Icon(
+                            Icons.settings_outlined,
+                            color: primaryBlue,
+                            size: 25,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(21, 8, 21, 20),
+                    child: Column(
+                      children: [
+                        Stack(
+                          children: [
+                            Container(
+                              width: 116,
+                              height: 116,
+                              padding: const EdgeInsets.all(2),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0BAA65),
-                                borderRadius: BorderRadius.circular(12),
+                                shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Colors.white,
+                                  color: const Color(0xFF9FC4D2),
                                   width: 2,
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.camera_alt_outlined,
-                                color: Colors.white,
-                                size: 19,
+                              child: ClipOval(
+                                child: photoUrl.isNotEmpty
+                                    ? Image.network(
+                                        photoUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                          return _defaultAvatar();
+                                        },
+                                      )
+                                    : _defaultAvatar(),
                               ),
                             ),
+                            Positioned(
+                              right: 0,
+                              bottom: 4,
+                              child: GestureDetector(
+                                onTap: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Profile photo upload will be connected later.',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: 35,
+                                  height: 35,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0BAA65),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.camera_alt_outlined,
+                                    color: Colors.white,
+                                    size: 19,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        Text(
+                          name,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF111827),
                           ),
                         ),
-                      ],
-                    ),
 
-                    const SizedBox(height: 10),
+                        const SizedBox(height: 5),
 
-                    const Text(
-                      'Rafiq Hasan',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF111827),
-                      ),
-                    ),
+                        const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('🇧🇩', style: TextStyle(fontSize: 15)),
+                            SizedBox(width: 6),
+                            Text(
+                              'Bangladesh',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF24334F),
+                              ),
+                            ),
+                          ],
+                        ),
 
-                    const SizedBox(height: 5),
+                        const SizedBox(height: 5),
 
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('🇧🇩', style: TextStyle(fontSize: 15)),
-                        SizedBox(width: 6),
                         Text(
-                          'Bangladesh',
-                          style: TextStyle(
-                            fontSize: 13,
+                          email,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF667085),
+                          ),
+                        ),
+
+                        const SizedBox(height: 13),
+
+                        Text(
+                          bio,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.4,
                             color: Color(0xFF24334F),
                           ),
                         ),
-                      ],
-                    ),
 
-                    const SizedBox(height: 13),
+                        const SizedBox(height: 16),
 
-                    const Text(
-                      'Passionate about learning\nand sharing skills with the world.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.4,
-                        color: Color(0xFF24334F),
-                      ),
-                    ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _statCard(
+                                icon: Icons.star,
+                                iconColor: const Color(0xFFFFB323),
+                                value: '4.8',
+                                label: 'Rating',
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _statCard(
+                                icon: Icons.groups,
+                                iconColor: const Color(0xFF2589F8),
+                                value: '245',
+                                label: 'Connections',
+                              ),
+                            ),
+                          ],
+                        ),
 
-                    const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _statCard(
-                            icon: Icons.star,
-                            iconColor: const Color(0xFFFFB323),
-                            value: '4.8',
-                            label: 'Rating',
+                        _sectionHeader(
+                          'My Skills',
+                          onEdit: () => showEditDialog(
+                            'Skills',
+                            skills,
+                            'skillsOffered',
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _statCard(
-                            icon: Icons.groups,
-                            iconColor: const Color(0xFF2589F8),
-                            value: '245',
-                            label: 'Connections',
+
+                        const SizedBox(height: 8),
+
+                        _buildChips(skills, false),
+
+                        const SizedBox(height: 18),
+
+                        _sectionHeader(
+                          'My Learning Goals',
+                          onEdit: () => showEditDialog(
+                            'Learning Goals',
+                            learningGoals,
+                            'skillsWanted',
                           ),
                         ),
+
+                        const SizedBox(height: 8),
+
+                        _buildChips(learningGoals, true),
                       ],
                     ),
-
-                    const SizedBox(height: 16),
-
-                    _sectionHeader(
-                      'My Skills',
-                      onEdit: () => showEditDialog('Skills', skills),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    _buildChips(skills, false),
-
-                    const SizedBox(height: 18),
-
-                    _sectionHeader(
-                      'My Learning Goals',
-                      onEdit: () =>
-                          showEditDialog('Learning Goals', learningGoals),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    _buildChips(learningGoals, true),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _defaultAvatar() {
+    return Container(
+      color: const Color(0xFFDDE8F0),
+      child: const Icon(
+        Icons.person,
+        size: 70,
+        color: Color(0xFF8092A8),
       ),
     );
   }
@@ -392,6 +501,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildChips(List<String> items, bool isLearning) {
+    if (items.isEmpty) {
+      return const Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          'No skills added yet. Tap Edit to add.',
+          style: TextStyle(
+            fontSize: 12,
+            color: Color(0xFF667085),
+          ),
+        ),
+      );
+    }
+
     return Align(
       alignment: Alignment.centerLeft,
       child: Wrap(
