@@ -39,12 +39,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final result = await showDialog<Map<String, String>>(
         context: context,
-        builder: (context) {
-          return _EditProfileDialog(
-            initialName: name,
-            initialBio: bio,
-          );
-        },
+        builder: (context) => _EditProfileDialog(
+          initialName: name,
+          initialBio: bio,
+        ),
       );
 
       if (!mounted || result == null) return;
@@ -76,15 +74,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } on FirebaseException catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Firebase error: ${e.message ?? e.code}'),
-        ),
+        SnackBar(content: Text('Firebase error: ${e.message ?? e.code}')),
       );
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not update profile: $e')),
       );
@@ -101,12 +95,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final newValue = await showDialog<String>(
       context: context,
-      builder: (dialogContext) {
-        return _AddSkillDialog(
-          title: title,
-          items: items,
-        );
-      },
+      builder: (context) => _AddSkillDialog(
+        title: title,
+        items: items,
+      ),
     );
 
     if (!mounted || newValue == null || newValue.trim().isEmpty) {
@@ -126,17 +118,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } on FirebaseException catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Firebase error: ${e.message ?? e.code}'),
-        ),
+        SnackBar(content: Text('Firebase error: ${e.message ?? e.code}')),
       );
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not save: $e')),
+      );
+    }
+  }
+
+  // Delete Skill
+  Future<void> _deleteSkill(String item, bool isLearning) async {
+    if (currentUser == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Skill?'),
+        content: Text('Do you want to delete "$item"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final fieldName =
+          isLearning ? 'skillsWanted' : 'skillsOffered';
+
+      await _userDocument.update({
+        fieldName: FieldValue.arrayRemove([item]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Skill deleted successfully!'),
+        ),
+      );
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Firebase error: ${e.message ?? e.code}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete skill: $e')),
       );
     }
   }
@@ -151,45 +196,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
           top: Radius.circular(24),
         ),
       ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Settings',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Settings',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 18),
-                ListTile(
-                  leading: const Icon(Icons.person_outline),
-                  title: const Text('Account Settings'),
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _editProfile();
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.notifications_none),
-                  title: const Text('Notifications'),
-                  onTap: () => Navigator.pop(sheetContext),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.lock_outline),
-                  title: const Text('Privacy & Security'),
-                  onTap: () => Navigator.pop(sheetContext),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 18),
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: const Text('Account Settings'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _editProfile();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.notifications_none),
+                title: const Text('Notifications'),
+                onTap: () => Navigator.pop(sheetContext),
+              ),
+              ListTile(
+                leading: const Icon(Icons.lock_outline),
+                title: const Text('Privacy & Security'),
+                onTap: () => Navigator.pop(sheetContext),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -216,9 +259,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (snapshot.hasError) {
           return const Scaffold(
             body: Center(
-              child: Text(
-                'Unable to load profile. Please try again.',
-              ),
+              child: Text('Unable to load profile. Please try again.'),
             ),
           );
         }
@@ -265,7 +306,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           body: SafeArea(
             child: Column(
               children: [
-                // Header
                 SizedBox(
                   height: 52,
                   child: Row(
@@ -297,7 +337,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ],
                   ),
                 ),
-
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(21, 8, 21, 20),
@@ -322,8 +361,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ? Image.network(
                                         photoUrl,
                                         fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) {
+                                        errorBuilder: (context, error, stackTrace) {
                                           return _defaultAvatar();
                                         },
                                       )
@@ -364,9 +402,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 10),
-
                         Text(
                           name,
                           textAlign: TextAlign.center,
@@ -376,9 +412,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: Color(0xFF111827),
                           ),
                         ),
-
                         const SizedBox(height: 5),
-
                         const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -393,9 +427,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 5),
-
                         Text(
                           email,
                           textAlign: TextAlign.center,
@@ -404,9 +436,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: Color(0xFF667085),
                           ),
                         ),
-
                         const SizedBox(height: 13),
-
                         Text(
                           bio,
                           textAlign: TextAlign.center,
@@ -416,10 +446,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: Color(0xFF24334F),
                           ),
                         ),
-
                         const SizedBox(height: 16),
-
-                        // Statistics
                         Row(
                           children: [
                             Expanded(
@@ -441,10 +468,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 16),
-
-                        // My Skills
                         _sectionHeader(
                           'My Skills',
                           onEdit: () => showEditDialog(
@@ -453,14 +477,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             'skillsOffered',
                           ),
                         ),
-
                         const SizedBox(height: 8),
-
                         _buildChips(skills, false),
-
                         const SizedBox(height: 18),
-
-                        // Learning Goals
                         _sectionHeader(
                           'My Learning Goals',
                           onEdit: () => showEditDialog(
@@ -469,9 +488,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             'skillsWanted',
                           ),
                         ),
-
                         const SizedBox(height: 8),
-
                         _buildChips(learningGoals, true),
                       ],
                     ),
@@ -563,6 +580,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Long press any skill to delete
   Widget _buildChips(List<String> items, bool isLearning) {
     if (items.isEmpty) {
       return const Align(
@@ -583,25 +601,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
         spacing: 7,
         runSpacing: 7,
         children: items.map((item) {
-          return Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 13,
-              vertical: 7,
-            ),
-            decoration: BoxDecoration(
-              color: isLearning
-                  ? const Color(0xFFE9E5FF)
-                  : const Color(0xFFE1EAFE),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              item,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+          return GestureDetector(
+            onLongPress: () => _deleteSkill(item, isLearning),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 13,
+                vertical: 7,
+              ),
+              decoration: BoxDecoration(
                 color: isLearning
-                    ? const Color(0xFF3D348B)
-                    : const Color(0xFF0752D8),
+                    ? const Color(0xFFE9E5FF)
+                    : const Color(0xFFE1EAFE),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                item,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isLearning
+                      ? const Color(0xFF3D348B)
+                      : const Color(0xFF0752D8),
+                ),
               ),
             ),
           );
@@ -672,7 +693,6 @@ class _AddSkillDialogState extends State<_AddSkillDialog> {
         ElevatedButton(
           onPressed: () {
             final value = _controller.text.trim();
-
             if (value.isNotEmpty) {
               Navigator.of(context).pop(value);
             }
