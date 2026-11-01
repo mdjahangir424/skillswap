@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -61,6 +60,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
 
                 Navigator.pop(dialogContext);
+                controller.dispose();
               },
               child: const Text('Add'),
             ),
@@ -128,19 +128,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Header
             SizedBox(
               height: 52,
-              child: Stack(
-                alignment: Alignment.center,
+              child: Row(
                 children: [
-                  const Text(
-                    'My Profile',
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF101828),
+                  const SizedBox(width: 48),
+                  const Expanded(
+                    child: Center(
+                      child: Text(
+                        'My Profile',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF101828),
+                        ),
+                      ),
                     ),
                   ),
-                  Positioned(
-                    right: 12,
+                  SizedBox(
+                    width: 48,
                     child: IconButton(
                       onPressed: showSettings,
                       icon: Icon(
@@ -154,13 +158,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
 
-            // Scrollable profile content
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(21, 8, 21, 20),
                 child: Column(
                   children: [
-                    // Profile image
                     Stack(
                       children: [
                         Container(
@@ -268,7 +270,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Rating and connections
                     Row(
                       children: [
                         Expanded(
@@ -293,7 +294,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     const SizedBox(height: 16),
 
-                    // My Skills
                     _sectionHeader(
                       'My Skills',
                       onEdit: () => showEditDialog('Skills', skills),
@@ -305,7 +305,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                     const SizedBox(height: 18),
 
-                    // Learning Goals
                     _sectionHeader(
                       'My Learning Goals',
                       onEdit: () =>
