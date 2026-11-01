@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'main_navigation.dart';
 
@@ -31,18 +32,51 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Step 1: Create Firebase Authentication account
       final credential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      await credential.user?.updateDisplayName(
-        _nameController.text.trim(),
-      );
+      final user = credential.user;
+
+      if (user == null) {
+        throw Exception('User account could not be created.');
+      }
+
+      final userName = _nameController.text.trim();
+
+      // Step 2: Update Firebase Auth display name
+      await user.updateDisplayName(userName);
+
+      // Step 3: Save user profile in Cloud Firestore
+      bool profileSaved = true;
+
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .set({
+          'uid': user.uid,
+          'name': userName,
+          'email': _emailController.text.trim(),
+          'bio': '',
+          'photoUrl': '',
+          'skillsOffered': [],
+          'skillsWanted': [],
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } catch (firestoreError) {
+        profileSaved = false;
+      }
 
       if (!mounted) return;
 
+      final messenger = ScaffoldMessenger.of(context);
+
+      // Step 4: Open the main app
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
@@ -50,6 +84,17 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         (route) => false,
       );
+
+      if (!profileSaved) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Account created, but profile could not be saved. Please contact support.',
+            ),
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
@@ -75,7 +120,7 @@ class _SignupScreenState extends State<SignupScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
