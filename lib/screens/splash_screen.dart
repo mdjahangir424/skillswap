@@ -1,6 +1,6 @@
 
 import 'package:flutter/material.dart';
-import 'main_navigation.dart';
+import 'login_screen.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -25,7 +25,6 @@ class SplashScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(flex: 2),
-
               ShaderMask(
                 shaderCallback: (bounds) =>
                     const LinearGradient(
@@ -44,9 +43,7 @@ class SplashScreen extends StatelessWidget {
                   ),
                 ),
               ),
-
               const SizedBox(height: 2),
-
               RichText(
                 text: const TextSpan(
                   style: TextStyle(
@@ -66,9 +63,7 @@ class SplashScreen extends StatelessWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 5),
-
               const Text(
                 'Learn. Teach. Exchange.',
                 style: TextStyle(
@@ -77,9 +72,7 @@ class SplashScreen extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-
               const SizedBox(height: 28),
-
               const Text(
                 'A World of Skills,\nOne Community.',
                 textAlign: TextAlign.center,
@@ -89,14 +82,11 @@ class SplashScreen extends StatelessWidget {
                   height: 1.5,
                 ),
               ),
-
               const Spacer(flex: 1),
-
               const Expanded(
                 flex: 3,
                 child: _GlobeNetwork(),
               ),
-
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 30,
@@ -110,8 +100,7 @@ class SplashScreen extends StatelessWidget {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              const MainNavigation(),
+                          builder: (context) => const LoginScreen(),
                         ),
                       );
                     },
@@ -176,10 +165,8 @@ class _GlobePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.1;
 
-    // Globe outline
     canvas.drawCircle(center, radius, globePaint);
 
-    // Longitude curves
     canvas.drawOval(
       Rect.fromCenter(
         center: center,
@@ -198,7 +185,6 @@ class _GlobePainter extends CustomPainter {
       globePaint,
     );
 
-    // Latitude curves
     canvas.drawOval(
       Rect.fromCenter(
         center: center,
@@ -257,7 +243,6 @@ class _GlobePainter extends CustomPainter {
       canvas.drawCircle(point, 4, nodePaint);
     }
 
-    // Small profile circles
     final avatarPositions = [
       Offset(size.width * 0.12, size.height * 0.45),
       Offset(size.width * 0.82, size.height * 0.45),
