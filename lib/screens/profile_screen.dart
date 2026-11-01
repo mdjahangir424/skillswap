@@ -21,94 +21,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .doc(currentUser!.uid);
   }
 
- 
-Future<void> showEditDialog(
-  String title,
-  List<String> items,
-  String fieldName,
-) async {
-  final controller = TextEditingController();
+  // Add Skills and Learning Goals
+  Future<void> showEditDialog(
+    String title,
+    List<String> items,
+    String fieldName,
+  ) async {
+    final controller = TextEditingController();
+    String? newValue;
 
-  String? newValue;
-
-  try {
-    newValue = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text('Edit $title'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                items.isEmpty
-                    ? 'No items added yet.'
-                    : items.join(', '),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  hintText: 'Enter a new item',
-                  border: OutlineInputBorder(),
+    try {
+      newValue = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: Text('Edit $title'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  items.isEmpty
+                      ? 'No items added yet.'
+                      : items.join(', '),
                 ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    hintText: 'Enter a new item',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                },
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  final value = controller.text.trim();
+
+                  if (value.isNotEmpty) {
+                    Navigator.pop(dialogContext, value);
+                  }
+                },
+                child: const Text('Add'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final value = controller.text.trim();
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
 
-                if (value.isNotEmpty) {
-                  Navigator.pop(dialogContext, value);
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
-    );
-  } finally {
-    controller.dispose();
+    if (!mounted || newValue == null || newValue.trim().isEmpty) {
+      return;
+    }
+
+    try {
+      await _userDocument.set({
+        fieldName: FieldValue.arrayUnion([newValue.trim()]),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Successfully added!'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not save. Please try again.'),
+        ),
+      );
+    }
   }
 
-  if (newValue == null || newValue!.isEmpty) return;
-
-  try {
-    await _userDocument.set({
-      fieldName: FieldValue.arrayUnion([newValue]),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-  } catch (e) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Could not save. Please try again.'),
-      ),
-    );
-  }
-}
-
-              child: const Text('Add'),
-            ),
-          ],
-        );
-      },
-    );
-
-    controller.dispose();
-  }
-
+  // Settings
   void showSettings() {
     showModalBottomSheet(
       context: context,
@@ -157,6 +158,7 @@ Future<void> showEditDialog(
     );
   }
 
+  // Convert Firestore list into String list
   List<String> _getStringList(dynamic value) {
     if (value is List) {
       return value.whereType<String>().toList();
@@ -180,7 +182,9 @@ Future<void> showEditDialog(
         if (snapshot.hasError) {
           return const Scaffold(
             body: Center(
-              child: Text('Unable to load profile. Please try again.'),
+              child: Text(
+                'Unable to load profile. Please try again.',
+              ),
             ),
           );
         }
@@ -205,7 +209,9 @@ Future<void> showEditDialog(
             'SkillSwap User';
 
         final String email =
-            (data['email'] as String?) ?? currentUser!.email ?? '';
+            (data['email'] as String?) ??
+            currentUser!.email ??
+            '';
 
         final String bio =
             (data['bio'] as String?) ??
@@ -260,9 +266,12 @@ Future<void> showEditDialog(
 
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(21, 8, 21, 20),
+                    padding: const EdgeInsets.fromLTRB(
+                      21, 8, 21, 20,
+                    ),
                     child: Column(
                       children: [
+                        // Profile Photo
                         Stack(
                           children: [
                             Container(
@@ -294,7 +303,8 @@ Future<void> showEditDialog(
                               bottom: 4,
                               child: GestureDetector(
                                 onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(
                                     const SnackBar(
                                       content: Text(
                                         'Profile photo upload will be connected later.',
@@ -307,7 +317,8 @@ Future<void> showEditDialog(
                                   height: 35,
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF0BAA65),
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius:
+                                        BorderRadius.circular(12),
                                     border: Border.all(
                                       color: Colors.white,
                                       width: 2,
@@ -326,6 +337,7 @@ Future<void> showEditDialog(
 
                         const SizedBox(height: 10),
 
+                        // Name
                         Text(
                           name,
                           textAlign: TextAlign.center,
@@ -341,7 +353,10 @@ Future<void> showEditDialog(
                         const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('🇧🇩', style: TextStyle(fontSize: 15)),
+                            Text(
+                              '🇧🇩',
+                              style: TextStyle(fontSize: 15),
+                            ),
                             SizedBox(width: 6),
                             Text(
                               'Bangladesh',
@@ -355,6 +370,7 @@ Future<void> showEditDialog(
 
                         const SizedBox(height: 5),
 
+                        // Email
                         Text(
                           email,
                           textAlign: TextAlign.center,
@@ -366,6 +382,7 @@ Future<void> showEditDialog(
 
                         const SizedBox(height: 13),
 
+                        // Bio
                         Text(
                           bio,
                           textAlign: TextAlign.center,
@@ -378,6 +395,7 @@ Future<void> showEditDialog(
 
                         const SizedBox(height: 16),
 
+                        // Statistics
                         Row(
                           children: [
                             Expanded(
@@ -402,6 +420,7 @@ Future<void> showEditDialog(
 
                         const SizedBox(height: 16),
 
+                        // My Skills
                         _sectionHeader(
                           'My Skills',
                           onEdit: () => showEditDialog(
@@ -417,6 +436,7 @@ Future<void> showEditDialog(
 
                         const SizedBox(height: 18),
 
+                        // Learning Goals
                         _sectionHeader(
                           'My Learning Goals',
                           onEdit: () => showEditDialog(
@@ -441,6 +461,7 @@ Future<void> showEditDialog(
     );
   }
 
+  // Default Avatar
   Widget _defaultAvatar() {
     return Container(
       color: const Color(0xFFDDE8F0),
@@ -452,6 +473,7 @@ Future<void> showEditDialog(
     );
   }
 
+  // Statistics Card
   Widget _statCard({
     required IconData icon,
     required Color iconColor,
@@ -489,6 +511,7 @@ Future<void> showEditDialog(
     );
   }
 
+  // Section Header
   Widget _sectionHeader(
     String title, {
     required VoidCallback onEdit,
@@ -519,6 +542,7 @@ Future<void> showEditDialog(
     );
   }
 
+  // Skills Chips
   Widget _buildChips(List<String> items, bool isLearning) {
     if (items.isEmpty) {
       return const Align(
