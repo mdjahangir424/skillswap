@@ -1,5 +1,6 @@
-import 'home_screen.dart';
+
 import 'package:flutter/material.dart';
+import 'main_navigation.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -105,14 +106,15 @@ class SplashScreen extends StatelessWidget {
                   width: double.infinity,
                   height: 54,
                   child: ElevatedButton(
-                  onPressed: () {
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (context) => const HomeScreen(),
-    ),
-  );
-},
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const MainNavigation(),
+                        ),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: const Color(0xFF073A91),
