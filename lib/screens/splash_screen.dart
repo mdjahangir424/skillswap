@@ -1,6 +1,5 @@
 
 import 'package:flutter/material.dart';
-import 'login_screen.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -25,6 +24,7 @@ class SplashScreen extends StatelessWidget {
           child: Column(
             children: [
               const Spacer(flex: 2),
+
               ShaderMask(
                 shaderCallback: (bounds) =>
                     const LinearGradient(
@@ -43,7 +43,9 @@ class SplashScreen extends StatelessWidget {
                   ),
                 ),
               ),
+
               const SizedBox(height: 2),
+
               RichText(
                 text: const TextSpan(
                   style: TextStyle(
@@ -63,7 +65,9 @@ class SplashScreen extends StatelessWidget {
                   ],
                 ),
               ),
+
               const SizedBox(height: 5),
+
               const Text(
                 'Learn. Teach. Exchange.',
                 style: TextStyle(
@@ -72,7 +76,9 @@ class SplashScreen extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+
               const SizedBox(height: 28),
+
               const Text(
                 'A World of Skills,\nOne Community.',
                 textAlign: TextAlign.center,
@@ -82,43 +88,40 @@ class SplashScreen extends StatelessWidget {
                   height: 1.5,
                 ),
               ),
+
               const Spacer(flex: 1),
+
               const Expanded(
                 flex: 3,
                 child: _GlobeNetwork(),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
+
+              const Padding(
+                padding: EdgeInsets.symmetric(
                   horizontal: 30,
-                  vertical: 18,
+                  vertical: 30,
                 ),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginScreen(),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: 26,
+                      height: 26,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.white,
                         ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF073A91),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    child: const Text(
-                      'Get Started  →',
+                    SizedBox(height: 14),
+                    Text(
+                      'Preparing your experience...',
                       style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
+                        color: Colors.white70,
+                        fontSize: 13,
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ],
@@ -238,7 +241,8 @@ class _GlobePainter extends CustomPainter {
       canvas.drawCircle(
         point,
         10,
-        Paint()..color = const Color(0xFF24D6FF).withOpacity(0.16),
+        Paint()
+          ..color = const Color(0xFF24D6FF).withOpacity(0.16),
       );
       canvas.drawCircle(point, 4, nodePaint);
     }
