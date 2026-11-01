@@ -107,19 +107,6 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () {
-                      Navigator.maybePop(context);
-                    },
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new,
-                      color: Color(0xFF526B91),
-                      size: 20,
-                    ),
-                  ),
-
-                  const SizedBox(width: 3),
-
                   ClipOval(
                     child: Image.network(
                       'https://randomuser.me/api/portraits/men/32.jpg',
@@ -213,7 +200,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
                   const SizedBox(height: 12),
 
-                  // Learning Session Card
                   _learningSessionCard(),
                 ],
               ),
