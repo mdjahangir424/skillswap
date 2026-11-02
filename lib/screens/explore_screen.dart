@@ -119,14 +119,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
 
     if (relatedRequests.any(
-      (doc) => doc.data()['status'] == 'pending' &&
+      (doc) =>
+          doc.data()['status'] == 'pending' &&
           doc.data()['senderId'] == currentUid,
     )) {
       return 'sent';
     }
 
     if (relatedRequests.any(
-      (doc) => doc.data()['status'] == 'pending' &&
+      (doc) =>
+          doc.data()['status'] == 'pending' &&
           doc.data()['senderId'] == otherUid,
     )) {
       return 'received';
@@ -213,9 +215,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
     if (query.isEmpty) return true;
 
     final name = (data['name'] ?? '').toString().toLowerCase();
+
     final offered = (data['skillsOffered'] as List? ?? [])
         .join(' ')
         .toLowerCase();
+
     final wanted = (data['skillsWanted'] as List? ?? [])
         .join(' ')
         .toLowerCase();
@@ -225,13 +229,357 @@ class _ExploreScreenState extends State<ExploreScreen> {
         wanted.contains(query);
   }
 
+  // Supports ISO country codes such as BD, US, IN, GB.
+  String _countryFlag(Map<String, dynamic> data) {
+    String code = (data['countryCode'] ??
+            data['country_code'] ??
+            '')
+        .toString()
+        .trim()
+        .toUpperCase();
+
+    if (code.isEmpty) {
+      final country = (data['country'] ??
+              data['countryName'] ??
+              '')
+          .toString()
+          .trim()
+          .toLowerCase();
+
+      const countryCodes = {
+        'bangladesh': 'BD',
+        'india': 'IN',
+        'pakistan': 'PK',
+        'united states': 'US',
+        'usa': 'US',
+        'united kingdom': 'GB',
+        'uk': 'GB',
+        'uae': 'AE',
+        'united arab emirates': 'AE',
+        'saudi arabia': 'SA',
+        'canada': 'CA',
+        'australia': 'AU',
+        'japan': 'JP',
+        'china': 'CN',
+        'nepal': 'NP',
+        'sri lanka': 'LK',
+        'malaysia': 'MY',
+        'singapore': 'SG',
+        'indonesia': 'ID',
+        'turkey': 'TR',
+        'germany': 'DE',
+        'france': 'FR',
+      };
+
+      code = countryCodes[country] ?? '';
+    }
+
+    if (code.length != 2 ||
+        !RegExp(r'^[A-Z]{2}$').hasMatch(code)) {
+      return '';
+    }
+
+    return String.fromCharCodes(
+      code.codeUnits.map((unit) => unit + 127397),
+    );
+  }
+
+  Widget _buildAvatar(
+    Map<String, dynamic> data,
+    String name,
+  ) {
+    final photoUrl = (data['photoUrl'] ?? '').toString().trim();
+
+    final initial =
+        name.isNotEmpty ? name[0].toUpperCase() : '?';
+
+    return CircleAvatar(
+      radius: 29,
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      backgroundImage: photoUrl.startsWith('http')
+          ? NetworkImage(photoUrl)
+          : null,
+      child: photoUrl.startsWith('http')
+          ? null
+          : Text(
+              initial,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+    );
+  }
+
+  Widget _buildSkillTags(
+    List<String> skills, {
+    int limit = 3,
+  }) {
+    if (skills.isEmpty) {
+      return const Text(
+        'Not added yet',
+        style: TextStyle(fontSize: 12, color: Colors.grey),
+      );
+    }
+
+    final visibleSkills = skills.take(limit).toList();
+
+    return Wrap(
+      spacing: 5,
+      runSpacing: 4,
+      children: [
+        ...visibleSkills.map(
+          (skill) => Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 5,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(context)
+                  .colorScheme
+                  .primary
+                  .withOpacity(0.07),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              skill,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+        if (skills.length > limit)
+          Text(
+            '+${skills.length - limit}',
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildRating(Map<String, dynamic> data) {
+    final rating = data['rating'];
+    final reviewCount = data['reviewCount'];
+
+    if (rating is! num) {
+      return const SizedBox.shrink();
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.star, color: Colors.orange, size: 16),
+        const SizedBox(width: 3),
+        Text(
+          rating.toStringAsFixed(1),
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        if (reviewCount is num) ...[
+          const SizedBox(width: 3),
+          Text(
+            '(${reviewCount.toInt()})',
+            style: const TextStyle(
+              fontSize: 11,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildConnectionButton(
+    String currentUid,
+    String userId,
+    String name,
+  ) {
+    return FutureBuilder<String>(
+      future: _getRelationshipStatus(currentUid, userId),
+      builder: (context, statusSnapshot) {
+        final status = statusSnapshot.data ?? 'loading';
+
+        String buttonText;
+        IconData buttonIcon;
+
+        switch (status) {
+          case 'connected':
+            buttonText = 'Connected';
+            buttonIcon = Icons.check_circle;
+            break;
+          case 'sent':
+            buttonText = 'Request Sent';
+            buttonIcon = Icons.hourglass_top;
+            break;
+          case 'received':
+            buttonText = 'Request Received';
+            buttonIcon = Icons.mark_email_unread;
+            break;
+          case 'loading':
+            buttonText = 'Checking...';
+            buttonIcon = Icons.sync;
+            break;
+          default:
+            buttonText = 'Connect';
+            buttonIcon = Icons.person_add_alt_1;
+        }
+
+        final isConnected = status == 'connected';
+        final isSent = status == 'sent';
+        final isReceived = status == 'received';
+
+        return SizedBox(
+          height: 36,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isConnected
+                  ? Colors.green.shade50
+                  : isSent
+                      ? Colors.grey.shade200
+                      : Theme.of(context).colorScheme.primary,
+              foregroundColor: isConnected
+                  ? Colors.green.shade800
+                  : isSent
+                      ? Colors.black54
+                      : Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: status == 'none' && !_sendingRequest
+                ? () => _sendConnectionRequest(userId, name)
+                : null,
+            icon: Icon(buttonIcon, size: 15),
+            label: Text(
+              buttonText,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildUserCard(
+    BuildContext context,
+    String currentUid,
+    QueryDocumentSnapshot<Map<String, dynamic>> userDoc,
+  ) {
+    final data = userDoc.data();
+
+    final name = (data['name'] ?? 'SkillSwap User').toString();
+
+    final offered =
+        List<String>.from(data['skillsOffered'] ?? []);
+
+    final wanted =
+        List<String>.from(data['skillsWanted'] ?? []);
+
+    final flag = _countryFlag(data);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 2,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(11),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _buildAvatar(data, name),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (flag.isNotEmpty) ...[
+                        const SizedBox(width: 5),
+                        Text(
+                          flag,
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Teaches',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  _buildSkillTags(offered, limit: 2),
+                  const SizedBox(height: 5),
+                  const Text(
+                    'Learns',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  _buildSkillTags(wanted, limit: 2),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      _buildRating(data),
+                      const Spacer(),
+                      _buildConnectionButton(
+                        currentUid,
+                        userDoc.id,
+                        name,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = FirebaseAuth.instance.currentUser;
 
     if (currentUser == null) {
       return const Scaffold(
-        body: Center(child: Text('Please log in to explore skills.')),
+        body: Center(
+          child: Text('Please log in to explore skills.'),
+        ),
       );
     }
 
@@ -241,17 +589,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
           'Explore Skills',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        centerTitle: false,
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
             child: TextField(
               controller: _searchController,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
-                hintText: 'Search people or skills...',
+                hintText: 'Search skills...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -263,6 +610,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       )
                     : null,
                 filled: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 13,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
@@ -272,7 +622,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
 
           SizedBox(
-            height: 48,
+            height: 43,
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               scrollDirection: Axis.horizontal,
@@ -296,28 +646,36 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 7, 12, 5),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'People to learn with',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
+                const Expanded(
+                  child: Text(
+                    'People to learn with',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 DropdownButton<String>(
                   value: _selectedSort,
                   underline: const SizedBox(),
+                  isDense: true,
                   items: const [
                     DropdownMenuItem(
                       value: 'Recommended',
-                      child: Text('Recommended'),
+                      child: Text(
+                        'Recommended',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                     DropdownMenuItem(
                       value: 'Recently Joined',
-                      child: Text('Recently Joined'),
+                      child: Text(
+                        'Recently Joined',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                   ],
                   onChanged: (value) {
@@ -331,7 +689,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
 
           Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            child: StreamBuilder<
+                QuerySnapshot<Map<String, dynamic>>>(
               stream: FirebaseFirestore.instance
                   .collection('users')
                   .snapshots(),
@@ -342,7 +701,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   );
                 }
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                if (snapshot.connectionState ==
+                    ConnectionState.waiting) {
                   return const Center(
                     child: CircularProgressIndicator(),
                   );
@@ -371,6 +731,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     final aDate = aTime is Timestamp
                         ? aTime.toDate()
                         : DateTime(2000);
+
                     final bDate = bTime is Timestamp
                         ? bTime.toDate()
                         : DateTime(2000);
@@ -386,163 +747,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 }
 
                 return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
                   itemCount: users.length,
                   itemBuilder: (context, index) {
-                    final userDoc = users[index];
-                    final data = userDoc.data();
-
-                    final name =
-                        (data['name'] ?? 'SkillSwap User').toString();
-
-                    final offered =
-                        List<String>.from(data['skillsOffered'] ?? []);
-
-                    final wanted =
-                        List<String>.from(data['skillsWanted'] ?? []);
-
-                    final initial =
-                        name.isNotEmpty ? name[0].toUpperCase() : '?';
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 25,
-                                  backgroundColor:
-                                      Theme.of(context).colorScheme.primary,
-                                  child: Text(
-                                    initial,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    name,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            if (offered.isNotEmpty) ...[
-                              const SizedBox(height: 14),
-                              const Text(
-                                'Skills Offered',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: offered.map((skill) {
-                                  return Chip(
-                                    label: Text(skill),
-                                    visualDensity: VisualDensity.compact,
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-
-                            if (wanted.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Skills Wanted',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: wanted.map((skill) {
-                                  return Chip(
-                                    label: Text(skill),
-                                    visualDensity: VisualDensity.compact,
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-
-                            const SizedBox(height: 12),
-
-                            SizedBox(
-                              width: double.infinity,
-                              child: FutureBuilder<String>(
-                                future: _getRelationshipStatus(
-                                  currentUser.uid,
-                                  userDoc.id,
-                                ),
-                                builder: (context, statusSnapshot) {
-                                  final status =
-                                      statusSnapshot.data ?? 'loading';
-
-                                  String buttonText;
-                                  switch (status) {
-                                    case 'connected':
-                                      buttonText = 'Connected';
-                                      break;
-                                    case 'sent':
-                                      buttonText = 'Request Sent';
-                                      break;
-                                    case 'received':
-                                      buttonText = 'Request Received';
-                                      break;
-                                    case 'loading':
-                                      buttonText = 'Checking...';
-                                      break;
-                                    default:
-                                      buttonText = 'Send Request';
-                                  }
-
-                                  final enabled = status == 'none' &&
-                                      !_sendingRequest;
-
-                                  return ElevatedButton.icon(
-                                    onPressed: enabled
-                                        ? () => _sendConnectionRequest(
-                                              userDoc.id,
-                                              name,
-                                            )
-                                        : null,
-                                    icon: Icon(
-                                      status == 'connected'
-                                          ? Icons.check_circle
-                                          : status == 'sent'
-                                              ? Icons.hourglass_top
-                                              : status == 'received'
-                                                  ? Icons.mark_email_unread
-                                                  : Icons.person_add_alt_1,
-                                    ),
-                                    label: Text(buttonText),
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    return _buildUserCard(
+                      context,
+                      currentUser.uid,
+                      users[index],
                     );
                   },
                 );
