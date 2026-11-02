@@ -1,3 +1,4 @@
+
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -610,27 +611,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _statCard(
-                                icon: Icons.star,
-                                iconColor: const Color(0xFFFFB323),
-                                value: '4.8',
-                                label: 'Rating',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _statCard(
-                                icon: Icons.groups,
-                                iconColor: const Color(0xFF2589F8),
-                                value: '245',
-                                label: 'Connections',
-                              ),
-                            ),
-                          ],
-                        ),
+
+                        // Live Rating and Connections
+                        _buildStats(currentUser!.uid),
+
                         const SizedBox(height: 16),
                         _sectionHeader(
                           'My Skills',
@@ -660,6 +644,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
+        );
+      },
+    );
+  }
+
+  // Real-time Profile Statistics
+  Widget _buildStats(String uid) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('connections')
+          .where('participants', arrayContains: uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final connectionCount =
+            snapshot.hasData ? snapshot.data!.docs.length : 0;
+
+        return Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                icon: Icons.star,
+                iconColor: const Color(0xFFFFB323),
+                value: '0.0',
+                label: 'Rating',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _statCard(
+                icon: Icons.groups,
+                iconColor: const Color(0xFF2589F8),
+                value: snapshot.hasError
+                    ? '--'
+                    : connectionCount.toString(),
+                label: 'Connections',
+              ),
+            ),
+          ],
         );
       },
     );
