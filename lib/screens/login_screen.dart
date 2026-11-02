@@ -18,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isResettingPassword = false;
 
   static const Color primaryBlue = Color(0xFF075CF5);
   static const Color darkBlue = Color(0xFF073A91);
@@ -33,8 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
-      // AuthCheck in main.dart will automatically
-      // detect the login and open MainNavigation.
+      // AuthCheck in main.dart detects login automatically.
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
@@ -77,16 +77,22 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _forgotPassword() async {
+    if (_isResettingPassword || _isLoading) return;
+
     final email = _emailController.text.trim();
 
-    if (email.isEmpty || !email.contains('@')) {
+    if (email.isEmpty || !RegExp(
+      r'^[^@]+@[^@]+\.[^@]+$',
+    ).hasMatch(email)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Enter your email address first.'),
+          content: Text('Enter a valid email address first.'),
         ),
       );
       return;
     }
+
+    setState(() => _isResettingPassword = true);
 
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(
@@ -110,6 +116,18 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Text(e.message ?? 'Could not send reset email.'),
         ),
       );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not send reset email.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isResettingPassword = false);
+      }
     }
   }
 
@@ -141,9 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: primaryBlue,
                     size: 65,
                   ),
-
                   const SizedBox(height: 12),
-
                   const Text(
                     'Welcome Back!',
                     textAlign: TextAlign.center,
@@ -153,9 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: Color(0xFF101828),
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   const Text(
                     'Login to continue your SkillSwap journey.',
                     textAlign: TextAlign.center,
@@ -164,9 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: Color(0xFF667085),
                     ),
                   ),
-
                   const SizedBox(height: 35),
-
                   const Text(
                     'Email Address',
                     style: TextStyle(
@@ -174,9 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       fontSize: 14,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -198,9 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 20),
-
                   const Text(
                     'Password',
                     style: TextStyle(
@@ -208,9 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       fontSize: 14,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
@@ -236,29 +242,34 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your password.';
                       }
-
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 5),
-
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: _forgotPassword,
-                      child: const Text(
-                        'Forgot Password?',
-                        style: TextStyle(
-                          color: primaryBlue,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      onPressed: (_isLoading || _isResettingPassword)
+                          ? null
+                          : _forgotPassword,
+                      child: _isResettingPassword
+                          ? const SizedBox(
+                              height: 17,
+                              width: 17,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              'Forgot Password?',
+                              style: TextStyle(
+                                color: primaryBlue,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
-
                   const SizedBox(height: 15),
-
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
@@ -291,9 +302,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                     ),
                   ),
-
                   const SizedBox(height: 25),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -304,14 +313,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const SignupScreen(),
-                            ),
-                          );
-                        },
+                        onPressed: _isLoading || _isResettingPassword
+                            ? null
+                            : () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const SignupScreen(),
+                                  ),
+                                );
+                              },
                         child: const Text(
                           'Sign Up',
                           style: TextStyle(
@@ -322,9 +334,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 10),
-
                   Text(
                     'Learn. Teach. Exchange.',
                     textAlign: TextAlign.center,
