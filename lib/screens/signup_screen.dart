@@ -24,15 +24,88 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
+  String? _selectedCountryCode;
+  String? _selectedGender;
+
   static const Color primaryBlue = Color(0xFF075CF5);
+
+  static const List<Map<String, String>> _countries = [
+    {'name': 'Bangladesh', 'code': 'BD'},
+    {'name': 'India', 'code': 'IN'},
+    {'name': 'Pakistan', 'code': 'PK'},
+    {'name': 'Nepal', 'code': 'NP'},
+    {'name': 'Sri Lanka', 'code': 'LK'},
+    {'name': 'United States', 'code': 'US'},
+    {'name': 'United Kingdom', 'code': 'GB'},
+    {'name': 'Canada', 'code': 'CA'},
+    {'name': 'Australia', 'code': 'AU'},
+    {'name': 'United Arab Emirates', 'code': 'AE'},
+    {'name': 'Saudi Arabia', 'code': 'SA'},
+    {'name': 'Qatar', 'code': 'QA'},
+    {'name': 'Kuwait', 'code': 'KW'},
+    {'name': 'Oman', 'code': 'OM'},
+    {'name': 'Malaysia', 'code': 'MY'},
+    {'name': 'Singapore', 'code': 'SG'},
+    {'name': 'Indonesia', 'code': 'ID'},
+    {'name': 'Japan', 'code': 'JP'},
+    {'name': 'China', 'code': 'CN'},
+    {'name': 'South Korea', 'code': 'KR'},
+    {'name': 'Turkey', 'code': 'TR'},
+    {'name': 'Germany', 'code': 'DE'},
+    {'name': 'France', 'code': 'FR'},
+    {'name': 'Italy', 'code': 'IT'},
+    {'name': 'Spain', 'code': 'ES'},
+    {'name': 'Netherlands', 'code': 'NL'},
+    {'name': 'South Africa', 'code': 'ZA'},
+    {'name': 'Nigeria', 'code': 'NG'},
+    {'name': 'Brazil', 'code': 'BR'},
+    {'name': 'Mexico', 'code': 'MX'},
+    {'name': 'New Zealand', 'code': 'NZ'},
+    {'name': 'Thailand', 'code': 'TH'},
+    {'name': 'Vietnam', 'code': 'VN'},
+    {'name': 'Philippines', 'code': 'PH'},
+    {'name': 'Ireland', 'code': 'IE'},
+    {'name': 'Sweden', 'code': 'SE'},
+    {'name': 'Switzerland', 'code': 'CH'},
+    {'name': 'Norway', 'code': 'NO'},
+    {'name': 'Russia', 'code': 'RU'},
+    {'name': 'Egypt', 'code': 'EG'},
+  ];
+
+  String _countryFlag(String countryCode) {
+    return countryCode.toUpperCase().codeUnits
+        .map((code) => String.fromCharCode(code + 127397))
+        .join();
+  }
+
+  String get _selectedCountryName {
+    final country = _countries.firstWhere(
+      (item) => item['code'] == _selectedCountryCode,
+      orElse: () => {'name': '', 'code': ''},
+    );
+    return country['name'] ?? '';
+  }
 
   Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_selectedCountryCode == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your country.')),
+      );
+      return;
+    }
+
+    if (_selectedGender == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your gender.')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // Step 1: Create Firebase Authentication account
       final credential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
@@ -47,36 +120,28 @@ class _SignupScreenState extends State<SignupScreen> {
 
       final userName = _nameController.text.trim();
 
-      // Step 2: Update Firebase Auth display name
       await user.updateDisplayName(userName);
 
-      // Step 3: Save user profile in Cloud Firestore
-      bool profileSaved = true;
-
-      try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .set({
-          'uid': user.uid,
-          'name': userName,
-          'email': _emailController.text.trim(),
-          'bio': '',
-          'photoUrl': '',
-          'skillsOffered': [],
-          'skillsWanted': [],
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      } catch (firestoreError) {
-        profileSaved = false;
-      }
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set({
+        'uid': user.uid,
+        'name': userName,
+        'email': _emailController.text.trim(),
+        'country': _selectedCountryName,
+        'countryCode': _selectedCountryCode,
+        'gender': _selectedGender,
+        'bio': '',
+        'photoUrl': '',
+        'skillsOffered': [],
+        'skillsWanted': [],
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       if (!mounted) return;
 
-      final messenger = ScaffoldMessenger.of(context);
-
-      // Step 4: Open the main app
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
@@ -84,17 +149,6 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         (route) => false,
       );
-
-      if (!profileSaved) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Account created, but profile could not be saved. Please contact support.',
-            ),
-            duration: Duration(seconds: 5),
-          ),
-        );
-      }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
@@ -125,7 +179,9 @@ class _SignupScreenState extends State<SignupScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Something went wrong. Please try again.'),
+          content: Text(
+            'Account could not be completed. Please try again.',
+          ),
         ),
       );
     } finally {
@@ -178,9 +234,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     color: primaryBlue,
                     size: 62,
                   ),
-
                   const SizedBox(height: 12),
-
                   const Text(
                     'Join SkillSwap!',
                     textAlign: TextAlign.center,
@@ -190,9 +244,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       color: Color(0xFF101828),
                     ),
                   ),
-
                   const SizedBox(height: 7),
-
                   const Text(
                     'Create your account and start exchanging skills.',
                     textAlign: TextAlign.center,
@@ -201,13 +253,10 @@ class _SignupScreenState extends State<SignupScreen> {
                       color: Color(0xFF667085),
                     ),
                   ),
-
                   const SizedBox(height: 30),
 
                   _fieldLabel('Full Name'),
-
                   const SizedBox(height: 8),
-
                   TextFormField(
                     controller: _nameController,
                     textCapitalization: TextCapitalization.words,
@@ -229,9 +278,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   const SizedBox(height: 18),
 
                   _fieldLabel('Email Address'),
-
                   const SizedBox(height: 8),
-
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -254,10 +301,76 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   const SizedBox(height: 18),
 
-                  _fieldLabel('Password'),
-
+                  _fieldLabel('Country'),
                   const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedCountryCode,
+                    isExpanded: true,
+                    decoration: _inputDecoration(
+                      hint: 'Select your country',
+                      icon: Icons.public,
+                    ),
+                    items: _countries.map((country) {
+                      final code = country['code']!;
+                      return DropdownMenuItem<String>(
+                        value: code,
+                        child: Text(
+                          '${_countryFlag(code)}  ${country['name']}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() => _selectedCountryCode = value);
+                    },
+                    validator: (value) {
+                      if (value == null) {
+                        return 'Please select your country.';
+                      }
+                      return null;
+                    },
+                  ),
 
+                  const SizedBox(height: 18),
+
+                  _fieldLabel('Gender'),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _selectedGender,
+                    isExpanded: true,
+                    decoration: _inputDecoration(
+                      hint: 'Select your gender',
+                      icon: Icons.person_outline,
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Male',
+                        child: Text('Male'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Female',
+                        child: Text('Female'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Prefer not to say',
+                        child: Text('Prefer not to say'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedGender = value);
+                    },
+                    validator: (value) {
+                      if (value == null) {
+                        return 'Please select an option.';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  _fieldLabel('Password'),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
@@ -292,9 +405,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   const SizedBox(height: 18),
 
                   _fieldLabel('Confirm Password'),
-
                   const SizedBox(height: 8),
-
                   TextFormField(
                     controller: _confirmPasswordController,
                     obscureText: _obscureConfirmPassword,
