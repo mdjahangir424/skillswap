@@ -83,30 +83,43 @@ class LearningSessionScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // Header - Back Arrow Fixed on Left
             SizedBox(
               height: 57,
+              width: double.infinity,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   const Text(
                     'Learning Session',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF101828),
                     ),
                   ),
+
                   Positioned(
-                    left: 8,
-                    child: IconButton(
-                      onPressed: () {
-                        Navigator.maybePop(context);
-                      },
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 19,
-                        color: Color(0xFF526B91),
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 48,
+                          minHeight: 48,
+                        ),
+                        onPressed: () {
+                          Navigator.maybePop(context);
+                        },
+                        icon: const Icon(
+                          Icons.arrow_back_ios_new,
+                          size: 19,
+                          color: Color(0xFF526B91),
+                        ),
                       ),
                     ),
                   ),
