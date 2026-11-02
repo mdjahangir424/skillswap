@@ -11,11 +11,15 @@ class ExploreScreen extends StatefulWidget {
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
-  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController =
+      TextEditingController();
 
   String _selectedCategory = 'All';
   String _selectedSort = 'Recommended';
   bool _sendingRequest = false;
+
+  // Cache relationship status to avoid repeated Firestore reads.
+  final Map<String, Future<String>> _relationshipCache = {};
 
   final List<String> _categories = [
     'All',
@@ -88,6 +92,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return 'All';
   }
 
+  // Check only requests between the current user and one other user.
   Future<String> _getRelationshipStatus(
     String currentUid,
     String otherUid,
@@ -95,46 +100,55 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final requests =
         FirebaseFirestore.instance.collection('connectionRequests');
 
-    final outgoing = await requests
+    final outgoingFuture = requests
         .where('senderId', isEqualTo: currentUid)
+        .where('receiverId', isEqualTo: otherUid)
         .get();
 
-    final incoming = await requests
+    final incomingFuture = requests
+        .where('senderId', isEqualTo: otherUid)
         .where('receiverId', isEqualTo: currentUid)
         .get();
 
-    final relatedRequests = [
-      ...outgoing.docs.where(
-        (doc) => doc.data()['receiverId'] == otherUid,
-      ),
-      ...incoming.docs.where(
-        (doc) => doc.data()['senderId'] == otherUid,
-      ),
-    ];
+    final results = await Future.wait([
+      outgoingFuture,
+      incomingFuture,
+    ]);
 
-    if (relatedRequests.any(
+    final outgoing = results[0].docs;
+    final incoming = results[1].docs;
+
+    final allRequests = [...outgoing, ...incoming];
+
+    if (allRequests.any(
       (doc) => doc.data()['status'] == 'accepted',
     )) {
       return 'connected';
     }
 
-    if (relatedRequests.any(
-      (doc) =>
-          doc.data()['status'] == 'pending' &&
-          doc.data()['senderId'] == currentUid,
+    if (outgoing.any(
+      (doc) => doc.data()['status'] == 'pending',
     )) {
       return 'sent';
     }
 
-    if (relatedRequests.any(
-      (doc) =>
-          doc.data()['status'] == 'pending' &&
-          doc.data()['senderId'] == otherUid,
+    if (incoming.any(
+      (doc) => doc.data()['status'] == 'pending',
     )) {
       return 'received';
     }
 
     return 'none';
+  }
+
+  Future<String> _getCachedRelationshipStatus(
+    String currentUid,
+    String otherUid,
+  ) {
+    return _relationshipCache.putIfAbsent(
+      otherUid,
+      () => _getRelationshipStatus(currentUid, otherUid),
+    );
   }
 
   Future<void> _sendConnectionRequest(
@@ -148,13 +162,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
     setState(() => _sendingRequest = true);
 
     try {
+      // Always check the latest status before sending.
       final status = await _getRelationshipStatus(
         currentUser.uid,
         receiverId,
       );
 
       if (status != 'none') {
+        _relationshipCache[receiverId] = Future.value(status);
+
         if (mounted) {
+          setState(() {});
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -181,25 +200,43 @@ class _ExploreScreenState extends State<ExploreScreen> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
+      // Update cache immediately after successful request.
+      _relationshipCache[receiverId] = Future.value('sent');
+
       if (mounted) {
+        setState(() {});
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Connection request sent to $receiverName.'),
+            content: Text(
+              'Connection request sent to $receiverName.',
+            ),
           ),
         );
-
-        setState(() {});
       }
     } on FirebaseException catch (e) {
+      // Remove cached status so the next check can try again.
+      _relationshipCache.remove(receiverId);
+
       if (mounted) {
+        setState(() {});
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Firebase error: ${e.message}')),
+          SnackBar(
+            content: Text('Firebase error: ${e.message}'),
+          ),
         );
       }
     } catch (e) {
+      _relationshipCache.remove(receiverId);
+
       if (mounted) {
+        setState(() {});
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not send request: $e')),
+          SnackBar(
+            content: Text('Could not send request: $e'),
+          ),
         );
       }
     } finally {
@@ -403,9 +440,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
     String name,
   ) {
     return FutureBuilder<String>(
-      future: _getRelationshipStatus(currentUid, userId),
+      future: _getCachedRelationshipStatus(
+        currentUid,
+        userId,
+      ),
       builder: (context, statusSnapshot) {
-        final status = statusSnapshot.data ?? 'loading';
+        final hasError = statusSnapshot.hasError;
+        final status = hasError
+            ? 'error'
+            : statusSnapshot.data ?? 'loading';
 
         String buttonText;
         IconData buttonIcon;
@@ -426,6 +469,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
           case 'loading':
             buttonText = 'Checking...';
             buttonIcon = Icons.sync;
+            break;
+          case 'error':
+            buttonText = 'Retry';
+            buttonIcon = Icons.refresh;
             break;
           default:
             buttonText = 'Connect';
@@ -458,7 +505,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
             onPressed: status == 'none' && !_sendingRequest
                 ? () => _sendConnectionRequest(userId, name)
-                : null,
+                : status == 'error'
+                    ? () {
+                        setState(() {
+                          _relationshipCache.remove(userId);
+                        });
+                      }
+                    : null,
             icon: Icon(buttonIcon, size: 15),
             label: Text(
               buttonText,
@@ -620,7 +673,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
           ),
-
           SizedBox(
             height: 43,
             child: ListView.builder(
@@ -644,7 +696,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
               },
             ),
           ),
-
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 7, 12, 5),
             child: Row(
@@ -687,7 +738,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ],
             ),
           ),
-
           Expanded(
             child: StreamBuilder<
                 QuerySnapshot<Map<String, dynamic>>>(
