@@ -11,6 +11,11 @@ class ExploreScreen extends StatefulWidget {
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
+  static const Color primaryBlue = Color(0xFF075CF5);
+  static const Color darkBlue = Color(0xFF073A91);
+  static const Color pageBackground = Color(0xFFF8F9FD);
+  static const Color tagBackground = Color(0xFFEEF3FF);
+
   final TextEditingController _searchController =
       TextEditingController();
 
@@ -18,7 +23,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
   String _selectedSort = 'Recommended';
   bool _sendingRequest = false;
 
-  // Cache relationship status to avoid repeated Firestore reads.
   final Map<String, Future<String>> _relationshipCache = {};
 
   final List<String> _categories = [
@@ -92,7 +96,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return 'All';
   }
 
-  // Check only requests between the current user and one other user.
   Future<String> _getRelationshipStatus(
     String currentUid,
     String otherUid,
@@ -117,7 +120,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     final outgoing = results[0].docs;
     final incoming = results[1].docs;
-
     final allRequests = [...outgoing, ...incoming];
 
     if (allRequests.any(
@@ -162,7 +164,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
     setState(() => _sendingRequest = true);
 
     try {
-      // Always check the latest status before sending.
       final status = await _getRelationshipStatus(
         currentUser.uid,
         receiverId,
@@ -200,7 +201,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Update cache immediately after successful request.
       _relationshipCache[receiverId] = Future.value('sent');
 
       if (mounted) {
@@ -215,7 +215,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
         );
       }
     } on FirebaseException catch (e) {
-      // Remove cached status so the next check can try again.
       _relationshipCache.remove(receiverId);
 
       if (mounted) {
@@ -266,7 +265,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
         wanted.contains(query);
   }
 
-  // Supports ISO country codes such as BD, US, IN, GB.
   String _countryFlag(Map<String, dynamic> data) {
     String code = (data['countryCode'] ??
             data['country_code'] ??
@@ -326,13 +324,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
     String name,
   ) {
     final photoUrl = (data['photoUrl'] ?? '').toString().trim();
-
-    final initial =
-        name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
 
     return CircleAvatar(
-      radius: 29,
-      backgroundColor: Theme.of(context).colorScheme.primary,
+      radius: 25,
+      backgroundColor: primaryBlue,
       backgroundImage: photoUrl.startsWith('http')
           ? NetworkImage(photoUrl)
           : null,
@@ -342,7 +338,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               initial,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -351,12 +347,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   Widget _buildSkillTags(
     List<String> skills, {
-    int limit = 3,
+    int limit = 2,
   }) {
     if (skills.isEmpty) {
       return const Text(
         'Not added yet',
-        style: TextStyle(fontSize: 12, color: Colors.grey),
+        style: TextStyle(fontSize: 11, color: Colors.grey),
       );
     }
 
@@ -370,19 +366,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
           (skill) => Container(
             padding: const EdgeInsets.symmetric(
               horizontal: 8,
-              vertical: 5,
+              vertical: 4,
             ),
             decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .primary
-                  .withOpacity(0.07),
-              borderRadius: BorderRadius.circular(8),
+              color: tagBackground,
+              borderRadius: BorderRadius.circular(7),
             ),
             child: Text(
               skill,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 10,
+                color: Color(0xFF344054),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -392,8 +386,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
           Text(
             '+${skills.length - limit}',
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.bold,
+              color: darkBlue,
             ),
           ),
       ],
@@ -404,28 +399,38 @@ class _ExploreScreenState extends State<ExploreScreen> {
     final rating = data['rating'];
     final reviewCount = data['reviewCount'];
 
-    if (rating is! num) {
-      return const SizedBox.shrink();
-    }
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.star, color: Colors.orange, size: 16),
-        const SizedBox(width: 3),
-        Text(
-          rating.toStringAsFixed(1),
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
+        const Icon(
+          Icons.star_rounded,
+          color: Colors.orange,
+          size: 15,
         ),
-        if (reviewCount is num) ...[
+        const SizedBox(width: 3),
+        if (rating is num)
+          Text(
+            rating.toStringAsFixed(1),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          )
+        else
+          const Text(
+            'New',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        if (reviewCount is num && reviewCount > 0) ...[
           const SizedBox(width: 3),
           Text(
             '(${reviewCount.toInt()})',
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 10,
               color: Colors.grey,
             ),
           ),
@@ -440,13 +445,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
     String name,
   ) {
     return FutureBuilder<String>(
-      future: _getCachedRelationshipStatus(
-        currentUid,
-        userId,
-      ),
+      future: _getCachedRelationshipStatus(currentUid, userId),
       builder: (context, statusSnapshot) {
-        final hasError = statusSnapshot.hasError;
-        final status = hasError
+        final status = statusSnapshot.hasError
             ? 'error'
             : statusSnapshot.data ?? 'loading';
 
@@ -456,7 +457,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
         switch (status) {
           case 'connected':
             buttonText = 'Connected';
-            buttonIcon = Icons.check_circle;
+            buttonIcon = Icons.check_circle_outline;
             break;
           case 'sent':
             buttonText = 'Request Sent';
@@ -464,10 +465,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
             break;
           case 'received':
             buttonText = 'Request Received';
-            buttonIcon = Icons.mark_email_unread;
+            buttonIcon = Icons.mark_email_unread_outlined;
             break;
           case 'loading':
-            buttonText = 'Checking...';
+            buttonText = 'Checking';
             buttonIcon = Icons.sync;
             break;
           case 'error':
@@ -481,26 +482,27 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
         final isConnected = status == 'connected';
         final isSent = status == 'sent';
-        final isReceived = status == 'received';
 
         return SizedBox(
-          height: 36,
+          height: 32,
           child: ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
               backgroundColor: isConnected
                   ? Colors.green.shade50
                   : isSent
                       ? Colors.grey.shade200
-                      : Theme.of(context).colorScheme.primary,
+                      : primaryBlue,
               foregroundColor: isConnected
                   ? Colors.green.shade800
                   : isSent
                       ? Colors.black54
                       : Colors.white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 9),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
             onPressed: status == 'none' && !_sendingRequest
@@ -512,11 +514,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         });
                       }
                     : null,
-            icon: Icon(buttonIcon, size: 15),
+            icon: Icon(buttonIcon, size: 13),
             label: Text(
               buttonText,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 10,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -532,34 +534,38 @@ class _ExploreScreenState extends State<ExploreScreen> {
     QueryDocumentSnapshot<Map<String, dynamic>> userDoc,
   ) {
     final data = userDoc.data();
-
     final name = (data['name'] ?? 'SkillSwap User').toString();
 
-    final offered =
-        List<String>.from(data['skillsOffered'] ?? []);
-
-    final wanted =
-        List<String>.from(data['skillsWanted'] ?? []);
-
+    final offered = List<String>.from(data['skillsOffered'] ?? []);
+    final wanted = List<String>.from(data['skillsWanted'] ?? []);
     final flag = _countryFlag(data);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      elevation: 2,
+      color: Colors.white,
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 1.5,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(13),
+        side: const BorderSide(
+          color: Color(0xFFE8ECF3),
+          width: 0.6,
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(11),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 9,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _buildAvatar(data, name),
-            const SizedBox(width: 11),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
                     children: [
@@ -569,41 +575,44 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
+                            color: Color(0xFF101828),
                           ),
                         ),
                       ),
                       if (flag.isNotEmpty) ...[
-                        const SizedBox(width: 5),
+                        const SizedBox(width: 4),
                         Text(
                           flag,
-                          style: const TextStyle(fontSize: 16),
+                          style: const TextStyle(fontSize: 13),
                         ),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   const Text(
                     'Teaches',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
+                      color: Color(0xFF344054),
                     ),
                   ),
                   const SizedBox(height: 2),
-                  _buildSkillTags(offered, limit: 2),
-                  const SizedBox(height: 5),
+                  _buildSkillTags(offered),
+                  const SizedBox(height: 4),
                   const Text(
                     'Learns',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
+                      color: Color(0xFF344054),
                     ),
                   ),
                   const SizedBox(height: 2),
-                  _buildSkillTags(wanted, limit: 2),
-                  const SizedBox(height: 6),
+                  _buildSkillTags(wanted),
+                  const SizedBox(height: 7),
                   Row(
                     children: [
                       _buildRating(data),
@@ -636,181 +645,244 @@ class _ExploreScreenState extends State<ExploreScreen> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Explore Skills',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
+    final blueTheme = Theme.of(context).copyWith(
+      colorScheme: Theme.of(context).colorScheme.copyWith(
+        primary: primaryBlue,
+        secondary: primaryBlue,
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: 'Search skills...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {});
-                        },
-                      )
-                    : null,
-                filled: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 13,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
+      scaffoldBackgroundColor: pageBackground,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.white,
+        foregroundColor: Color(0xFF101828),
+        elevation: 0,
+      ),
+      chipTheme: Theme.of(context).chipTheme.copyWith(
+        selectedColor: primaryBlue.withOpacity(0.12),
+        secondarySelectedColor: primaryBlue.withOpacity(0.12),
+        checkmarkColor: primaryBlue,
+        labelStyle: const TextStyle(fontSize: 12),
+      ),
+    );
+
+    return Theme(
+      data: blueTheme,
+      child: Scaffold(
+        backgroundColor: pageBackground,
+        appBar: AppBar(
+          title: const Text(
+            'Explore Skills',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 7),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'Search skills...',
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: primaryBlue,
+                  ),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    vertical: 11,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFDCE3F0),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFDCE3F0),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                      color: primaryBlue,
+                      width: 1.4,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-          SizedBox(
-            height: 43,
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              scrollDirection: Axis.horizontal,
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final category = _categories[index];
-                final selected = _selectedCategory == category;
+            SizedBox(
+              height: 39,
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                scrollDirection: Axis.horizontal,
+                itemCount: _categories.length,
+                itemBuilder: (context, index) {
+                  final category = _categories[index];
+                  final selected = _selectedCategory == category;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: ChoiceChip(
-                    label: Text(category),
-                    selected: selected,
-                    onSelected: (_) {
-                      setState(() => _selectedCategory = category);
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: ChoiceChip(
+                      label: Text(category),
+                      selected: selected,
+                      showCheckmark: true,
+                      checkmarkColor: primaryBlue,
+                      selectedColor: primaryBlue.withOpacity(0.12),
+                      backgroundColor: Colors.white,
+                      side: BorderSide(
+                        color: selected
+                            ? primaryBlue
+                            : const Color(0xFFDCE3F0),
+                      ),
+                      labelStyle: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: selected ? primaryBlue : const Color(0xFF344054),
+                      ),
+                      onSelected: (_) {
+                        setState(() => _selectedCategory = category);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 5, 10, 3),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'People to learn with',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF101828),
+                      ),
+                    ),
+                  ),
+                  DropdownButton<String>(
+                    value: _selectedSort,
+                    underline: const SizedBox(),
+                    isDense: true,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down,
+                      color: primaryBlue,
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Recommended',
+                        child: Text(
+                          'Recommended',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Recently Joined',
+                        child: Text(
+                          'Recently Joined',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() => _selectedSort = value);
+                      }
                     },
                   ),
-                );
-              },
+                ],
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 7, 12, 5),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'People to learn with',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                DropdownButton<String>(
-                  value: _selectedSort,
-                  underline: const SizedBox(),
-                  isDense: true,
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'Recommended',
-                      child: Text(
-                        'Recommended',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Recently Joined',
-                      child: Text(
-                        'Recently Joined',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _selectedSort = value);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: StreamBuilder<
-                QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance
-                  .collection('users')
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text('Error: ${snapshot.error}'),
-                  );
-                }
-
-                if (snapshot.connectionState ==
-                    ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
-
-                final users = snapshot.data!.docs.where((doc) {
-                  if (doc.id == currentUser.uid) return false;
-
-                  final data = doc.data();
-
-                  if (!_matchesSearch(data)) return false;
-
-                  if (_selectedCategory != 'All' &&
-                      _categoryForUser(data) != _selectedCategory) {
-                    return false;
+            Expanded(
+              child: StreamBuilder<
+                  QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('users')
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error: ${snapshot.error}'),
+                    );
                   }
 
-                  return true;
-                }).toList();
-
-                if (_selectedSort == 'Recently Joined') {
-                  users.sort((a, b) {
-                    final aTime = a.data()['createdAt'];
-                    final bTime = b.data()['createdAt'];
-
-                    final aDate = aTime is Timestamp
-                        ? aTime.toDate()
-                        : DateTime(2000);
-
-                    final bDate = bTime is Timestamp
-                        ? bTime.toDate()
-                        : DateTime(2000);
-
-                    return bDate.compareTo(aDate);
-                  });
-                }
-
-                if (users.isEmpty) {
-                  return const Center(
-                    child: Text('No users found.'),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-                  itemCount: users.length,
-                  itemBuilder: (context, index) {
-                    return _buildUserCard(
-                      context,
-                      currentUser.uid,
-                      users[index],
+                  if (snapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: primaryBlue,
+                      ),
                     );
-                  },
-                );
-              },
+                  }
+
+                  final users = snapshot.data!.docs.where((doc) {
+                    if (doc.id == currentUser.uid) return false;
+
+                    final data = doc.data();
+
+                    if (!_matchesSearch(data)) return false;
+
+                    if (_selectedCategory != 'All' &&
+                        _categoryForUser(data) != _selectedCategory) {
+                      return false;
+                    }
+
+                    return true;
+                  }).toList();
+
+                  if (_selectedSort == 'Recently Joined') {
+                    users.sort((a, b) {
+                      final aTime = a.data()['createdAt'];
+                      final bTime = b.data()['createdAt'];
+
+                      final aDate = aTime is Timestamp
+                          ? aTime.toDate()
+                          : DateTime(2000);
+
+                      final bDate = bTime is Timestamp
+                          ? bTime.toDate()
+                          : DateTime(2000);
+
+                      return bDate.compareTo(aDate);
+                    });
+                  }
+
+                  if (users.isEmpty) {
+                    return const Center(
+                      child: Text('No users found.'),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(10, 3, 10, 12),
+                    itemCount: users.length,
+                    itemBuilder: (context, index) {
+                      return _buildUserCard(
+                        context,
+                        currentUser.uid,
+                        users[index],
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
