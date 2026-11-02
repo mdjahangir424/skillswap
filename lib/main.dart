@@ -79,8 +79,21 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-class AuthCheck extends StatelessWidget {
+class AuthCheck extends StatefulWidget {
   const AuthCheck({super.key});
+
+  @override
+  State<AuthCheck> createState() => _AuthCheckState();
+}
+
+class _AuthCheckState extends State<AuthCheck> {
+  bool _showLogin = false;
+
+  void _openLogin() {
+    setState(() {
+      _showLogin = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,7 +112,13 @@ class AuthCheck extends StatelessWidget {
           return const MainNavigation();
         }
 
-        return const LoginScreen();
+        if (_showLogin) {
+          return const LoginScreen();
+        }
+
+        return SplashScreen(
+          onGetStarted: _openLogin,
+        );
       },
     );
   }
