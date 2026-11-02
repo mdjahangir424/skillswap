@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -95,6 +94,14 @@ class _AuthCheckState extends State<AuthCheck> {
     });
   }
 
+  Future<bool> _checkEmailVerification(User user) async {
+    await user.reload();
+
+    final refreshedUser = FirebaseAuth.instance.currentUser;
+
+    return refreshedUser != null && refreshedUser.emailVerified;
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
@@ -108,8 +115,31 @@ class _AuthCheckState extends State<AuthCheck> {
           return const LoginScreen();
         }
 
-        if (snapshot.hasData) {
-          return const MainNavigation();
+        final user = snapshot.data;
+
+        if (user != null) {
+          return FutureBuilder<bool>(
+            key: ValueKey(user.uid),
+            future: _checkEmailVerification(user),
+            builder: (context, verificationSnapshot) {
+              if (verificationSnapshot.connectionState ==
+                  ConnectionState.waiting) {
+                return const SplashScreen();
+              }
+
+              if (verificationSnapshot.hasError) {
+                return const LoginScreen();
+              }
+
+              if (verificationSnapshot.data == true) {
+                return const MainNavigation();
+              }
+
+              // Keep the unverified user signed in so
+              // they can resend the verification email.
+              return const LoginScreen();
+            },
+          );
         }
 
         if (_showLogin) {
