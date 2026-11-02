@@ -3,7 +3,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final VoidCallback? onGetStarted;
+
+  const SplashScreen({
+    super.key,
+    this.onGetStarted,
+  });
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -46,7 +51,6 @@ class _SplashScreenState extends State<SplashScreen>
                 },
               ),
             ),
-
             SafeArea(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -54,7 +58,6 @@ class _SplashScreenState extends State<SplashScreen>
                     children: [
                       const Spacer(flex: 3),
 
-                      // SkillSwap S Logo
                       SizedBox(
                         height: constraints.maxHeight * 0.19,
                         child: Stack(
@@ -80,7 +83,6 @@ class _SplashScreenState extends State<SplashScreen>
                                 ),
                               ),
                             ),
-
                             Transform.rotate(
                               angle: -0.35,
                               child: Container(
@@ -109,7 +111,6 @@ class _SplashScreenState extends State<SplashScreen>
 
                       const SizedBox(height: 8),
 
-                      // Brand Name
                       RichText(
                         textAlign: TextAlign.center,
                         text: const TextSpan(
@@ -160,7 +161,6 @@ class _SplashScreenState extends State<SplashScreen>
 
                       const Spacer(flex: 2),
 
-                      // Animated Global Network
                       Expanded(
                         flex: 5,
                         child: AnimatedBuilder(
@@ -178,37 +178,81 @@ class _SplashScreenState extends State<SplashScreen>
 
                       const Spacer(),
 
-                      // Loading Indicator
-                      AnimatedBuilder(
-                        animation: _animation,
-                        builder: (context, child) {
-                          return Transform.rotate(
-                            angle: _animation.value * math.pi * 2,
-                            child: const SizedBox(
-                              width: 46,
-                              height: 46,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 4,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(
-                                  Color(0xFF35D9FF),
+                      if (widget.onGetStarted != null) ...[
+                        SizedBox(
+                          width: 230,
+                          height: 54,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF00DFFF),
+                                  Color(0xFF537BFF),
+                                  Color(0xFFAB7AFF),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF00DFFF)
+                                      .withOpacity(0.30),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              onPressed: widget.onGetStarted,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                foregroundColor: Colors.white,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: const Text(
+                                'Get Started',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                             ),
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 15),
-
-                      const Text(
-                        'Preparing your experience...',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          letterSpacing: 0.3,
+                          ),
                         ),
-                      ),
+                      ] else ...[
+                        AnimatedBuilder(
+                          animation: _animation,
+                          builder: (context, child) {
+                            return Transform.rotate(
+                              angle: _animation.value * math.pi * 2,
+                              child: const SizedBox(
+                                width: 46,
+                                height: 46,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 4,
+                                  valueColor:
+                                      AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF35D9FF),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 15),
+                        const Text(
+                          'Preparing your experience...',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
 
                       const SizedBox(height: 25),
                     ],
@@ -223,7 +267,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-// Background: gradient atmosphere, stars and blue-purple waves
 class BackgroundPainter extends CustomPainter {
   final double animation;
 
@@ -233,7 +276,6 @@ class BackgroundPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final random = math.Random(24);
 
-    // Background glow
     final glow = Paint()
       ..shader = const RadialGradient(
         colors: [
@@ -245,12 +287,8 @@ class BackgroundPainter extends CustomPainter {
         Rect.fromLTWH(0, 0, size.width, size.height),
       );
 
-    canvas.drawRect(
-      Offset.zero & size,
-      glow,
-    );
+    canvas.drawRect(Offset.zero & size, glow);
 
-    // Stars
     final starPaint = Paint()
       ..color = const Color(0xFF3EDCFF);
 
@@ -258,8 +296,8 @@ class BackgroundPainter extends CustomPainter {
       final x = random.nextDouble() * size.width;
       final y = random.nextDouble() * size.height;
 
-      final pulse = 1 +
-          math.sin(animation * math.pi * 2 + i) * 0.5;
+      final pulse =
+          1 + math.sin(animation * math.pi * 2 + i) * 0.5;
 
       canvas.drawCircle(
         Offset(x, y),
@@ -268,7 +306,6 @@ class BackgroundPainter extends CustomPainter {
       );
     }
 
-    // Top blue wave
     final topWave = Path()
       ..moveTo(0, 0)
       ..lineTo(size.width * .42, 0)
@@ -287,7 +324,6 @@ class BackgroundPainter extends CustomPainter {
       Paint()..color = const Color(0xFF0755C5).withOpacity(.5),
     );
 
-    // Bottom waves
     final bottomWave = Path()
       ..moveTo(0, size.height * .91)
       ..cubicTo(
@@ -346,7 +382,6 @@ class BackgroundPainter extends CustomPainter {
       oldDelegate.animation != animation;
 }
 
-// Globe and connected community avatars
 class GlobePainter extends CustomPainter {
   final double animation;
 
@@ -364,7 +399,6 @@ class GlobePainter extends CustomPainter {
       size.height * .39,
     );
 
-    // Globe glow
     final glowPaint = Paint()
       ..shader = RadialGradient(
         colors: [
@@ -385,7 +419,6 @@ class GlobePainter extends CustomPainter {
       glowPaint,
     );
 
-    // Globe outline
     final globePaint = Paint()
       ..color = const Color(0xFF48DFFF).withOpacity(.75)
       ..style = PaintingStyle.stroke
@@ -393,7 +426,6 @@ class GlobePainter extends CustomPainter {
 
     canvas.drawCircle(center, radius, globePaint);
 
-    // Longitude
     canvas.drawOval(
       Rect.fromCenter(
         center: center,
@@ -412,7 +444,6 @@ class GlobePainter extends CustomPainter {
       globePaint,
     );
 
-    // Latitude
     for (final factor in [.55, 1.0, 1.45]) {
       canvas.drawOval(
         Rect.fromCenter(
@@ -424,7 +455,6 @@ class GlobePainter extends CustomPainter {
       );
     }
 
-    // Globe network connections
     final nodes = [
       Offset(center.dx - radius * .75, center.dy - radius * .55),
       Offset(center.dx + radius * .75, center.dy - radius * .55),
@@ -447,7 +477,6 @@ class GlobePainter extends CustomPainter {
       );
     }
 
-    // Orbital network paths
     final orbitPaint = Paint()
       ..color = const Color(0xFF22DFFF).withOpacity(.8)
       ..style = PaintingStyle.stroke
@@ -468,7 +497,6 @@ class GlobePainter extends CustomPainter {
 
     canvas.restore();
 
-    // Four avatar bubbles
     final avatars = [
       (
         Offset(center.dx - radius * 1.05, center.dy - radius * .85),
@@ -532,7 +560,6 @@ class GlobePainter extends CustomPainter {
       );
     }
 
-    // Globe center light
     canvas.drawCircle(
       center,
       5,
