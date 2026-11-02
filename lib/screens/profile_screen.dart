@@ -27,6 +27,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         .doc(currentUser!.uid);
   }
 
+  // Convert country code into flag emoji.
+  String _countryFlag(String countryCode) {
+    final code = countryCode.trim().toUpperCase();
+
+    if (code.length != 2 ||
+        !RegExp(r'^[A-Z]{2}$').hasMatch(code)) {
+      return '';
+    }
+
+    return String.fromCharCodes(
+      code.codeUnits.map((value) => value + 127397),
+    );
+  }
+
   // Upload Profile Photo
   Future<void> _uploadProfilePhoto() async {
     if (currentUser == null || _isUploadingPhoto) return;
@@ -456,6 +470,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final String photoUrl =
             (data['photoUrl'] as String?) ?? '';
 
+        // Country information saved during signup.
+        final String country =
+            (data['country'] as String?)?.trim() ?? '';
+
+        final String countryCode =
+            (data['countryCode'] as String?)?.trim() ?? '';
+
+        final String flag = _countryFlag(countryCode);
+
         final List<String> skills =
             _getStringList(data['skillsOffered']);
 
@@ -577,20 +600,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         const SizedBox(height: 5),
-                        const Row(
+
+                        // Dynamic Country and Flag
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('🇧🇩', style: TextStyle(fontSize: 15)),
-                            SizedBox(width: 6),
+                            if (flag.isNotEmpty) ...[
+                              Text(
+                                flag,
+                                style: const TextStyle(fontSize: 15),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
                             Text(
-                              'Bangladesh',
-                              style: TextStyle(
+                              country.isNotEmpty
+                                  ? country
+                                  : 'Country not set',
+                              style: const TextStyle(
                                 fontSize: 13,
                                 color: Color(0xFF24334F),
                               ),
                             ),
                           ],
                         ),
+
                         const SizedBox(height: 5),
                         Text(
                           email,
