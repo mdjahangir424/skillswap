@@ -1,6 +1,4 @@
-
 import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -40,7 +38,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (selectedImage == null) return;
-
       if (!mounted) return;
 
       setState(() {
@@ -83,9 +80,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Firebase error: ${e.message ?? e.code}',
-          ),
+          content: Text('Firebase error: ${e.message ?? e.code}'),
         ),
       );
     } catch (e) {
@@ -290,6 +285,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // Sign out
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log Out?'),
+        content: const Text(
+          'Are you sure you want to log out of SkillSwap?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not log out: $e'),
+        ),
+      );
+    }
+  }
+
   // Settings
   void showSettings() {
     showModalBottomSheet(
@@ -332,6 +368,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 leading: const Icon(Icons.lock_outline),
                 title: const Text('Privacy & Security'),
                 onTap: () => Navigator.pop(sheetContext),
+              ),
+              const Divider(height: 24),
+              ListTile(
+                leading: const Icon(
+                  Icons.logout,
+                  color: Colors.red,
+                ),
+                title: const Text(
+                  'Log Out',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _logout();
+                },
               ),
             ],
           ),
