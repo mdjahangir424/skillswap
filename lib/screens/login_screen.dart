@@ -1,3 +1,4 @@
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -21,17 +22,18 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _isResettingPassword = false;
-  bool _isResending = false;
 
   Timer? _resendTimer;
-  int _resendSeconds = 0;
+
+  final ValueNotifier<int> _resendSeconds = ValueNotifier<int>(0);
+  final ValueNotifier<bool> _isResending = ValueNotifier<bool>(false);
 
   static const Color primaryBlue = Color(0xFF075CF5);
   static const Color darkBlue = Color(0xFF073A91);
 
   void _startResendCooldown() {
     _resendTimer?.cancel();
-    setState(() => _resendSeconds = 60);
+    _resendSeconds.value = 60;
 
     _resendTimer = Timer.periodic(
       const Duration(seconds: 1),
@@ -41,54 +43,111 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
 
-        setState(() {
-          if (_resendSeconds > 0) {
-            _resendSeconds--;
-          } else {
-            timer.cancel();
-          }
-        });
+        if (_resendSeconds.value <= 1) {
+          _resendSeconds.value = 0;
+          timer.cancel();
+        } else {
+          _resendSeconds.value--;
+        }
       },
     );
   }
 
-  Future<void> _resendVerification(User user) async {
-    if (_isResending || _resendSeconds > 0) return;
+  void _showMessage(String message) {
+    if (!mounted) return;
 
-    setState(() => _isResending = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 6),
+      ),
+    );
+  }
 
+  String _authError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+        return 'No account found with this email.';
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Incorrect email or password.';
+      case 'invalid-email':
+        return 'Please enter a valid email address.';
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again later.';
+      case 'network-request-failed':
+        return 'Network error. Check your internet connection.';
+      case 'user-disabled':
+        return 'This account has been disabled.';
+      case 'operation-not-allowed':
+        return 'Email/Password login is not enabled.';
+      default:
+        return '${e.code}: ${e.message ?? 'Login failed.'}';
+    }
+  }
+
+  Future<String?> _sendVerification(User user) async {
     try {
       await user.sendEmailVerification();
-
-      if (!mounted) return;
-
-      _startResendCooldown();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Verification email sent. Check your inbox.'),
-        ),
-      );
+      debugPrint('Verification email sent to ${user.email}');
+      return null;
     } on FirebaseAuthException catch (e) {
+      debugPrint('VERIFICATION ERROR: ${e.code} - ${e.message}');
+      return _authError(e);
+    } catch (e) {
+      debugPrint('UNKNOWN VERIFICATION ERROR: $e');
+      return 'Could not send verification email: $e';
+    }
+  }
+
+  Future<void> _resendVerification(User user) async {
+    if (_isResending.value || _resendSeconds.value > 0) return;
+
+    _isResending.value = true;
+
+    try {
+      final error = await _sendVerification(user);
+
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message ?? 'Could not send verification email.'),
-        ),
-      );
+      if (error == null) {
+        _startResendCooldown();
+        _showMessage('Verification email sent. Check your inbox.');
+      } else {
+        _showMessage('Email sending failed: $error');
+      }
     } finally {
-      if (mounted) setState(() => _isResending = false);
+      _isResending.value = false;
+    }
+  }
+
+  Future<bool> _checkVerification(User user) async {
+    try {
+      await user.reload();
+
+      final refreshedUser = FirebaseAuth.instance.currentUser;
+      if (refreshedUser == null) return false;
+
+      await refreshedUser.getIdToken(true);
+      await refreshedUser.reload();
+
+      return FirebaseAuth.instance.currentUser?.emailVerified ?? false;
+    } catch (e) {
+      debugPrint('VERIFICATION CHECK ERROR: $e');
+      return false;
     }
   }
 
   Future<void> _showVerificationDialog(User user) async {
     _startResendCooldown();
 
-    await showDialog<void>(
+    final verified = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
+        bool checking = false;
+        String? dialogError;
+
         return StatefulBuilder(
           builder: (context, dialogSetState) {
             return Dialog(
@@ -102,186 +161,207 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      height: 82,
-                      width: 82,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEAF1FF),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.mark_email_read_rounded,
-                        color: primaryBlue,
-                        size: 43,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Your Account Created!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF172033),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Verify Your Email',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: primaryBlue,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'A verification link is required for your SkillSwap account:\n'
-                      '${user.email ?? ''}\n\n'
-                      'Please check your inbox and click the verification link.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Color(0xFF667085),
-                        fontSize: 13,
-                        height: 1.55,
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          try {
-                            await user.reload();
-                            final refreshedUser =
-                                FirebaseAuth.instance.currentUser;
-
-                            if (refreshedUser?.emailVerified == true) {
-                              if (dialogContext.mounted) {
-                                Navigator.pop(dialogContext);
-                              }
-
-                              if (mounted) {
-                                Navigator.pushAndRemoveUntil(
-                                  this.context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const MainNavigation(),
-                                  ),
-                                  (route) => false,
-                                );
-                              }
-                            } else {
-                              if (dialogContext.mounted) {
-                                ScaffoldMessenger.of(dialogContext)
-                                    .showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Email not verified yet. Click the link in your inbox first.',
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          } catch (_) {
-                            if (dialogContext.mounted) {
-                              ScaffoldMessenger.of(dialogContext)
-                                  .showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Could not check verification. Please try again.',
-                                  ),
-                                ),
-                              );
-                            }
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryBlue,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(13),
-                          ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        height: 82,
+                        width: 82,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEAF1FF),
+                          shape: BoxShape.circle,
                         ),
-                        child: const Text(
-                          'Verify Your Email',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        child: const Icon(
+                          Icons.mark_email_read_rounded,
+                          color: primaryBlue,
+                          size: 43,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: (_isResending || _resendSeconds > 0)
-                          ? null
-                          : () async {
-                              await _resendVerification(user);
-                              dialogSetState(() {});
-                            },
-                      child: _isResending
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              _resendSeconds > 0
-                                  ? 'Resend available in 00:${_resendSeconds.toString().padLeft(2, '0')}'
-                                  : 'Resend Verification Email',
-                              style: TextStyle(
-                                color: _resendSeconds > 0
-                                    ? Colors.grey
-                                    : primaryBlue,
-                                fontWeight: FontWeight.w600,
-                              ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Your Account Created!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF172033),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Verify Your Email',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: primaryBlue,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'A verification link is required for your SkillSwap account:\n'
+                        '${user.email ?? ''}\n\n'
+                        'Please check your inbox and click the verification link.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Color(0xFF667085),
+                          fontSize: 13,
+                          height: 1.55,
+                        ),
+                      ),
+                      if (dialogError != null) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF0F0),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            dialogError!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 12,
                             ),
-                    ),
-                    const SizedBox(height: 5),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.access_time_rounded,
-                          size: 15,
-                          color: Color(0xFF98A2B3),
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          'Resend available after 1 minute.',
-                          style: TextStyle(
-                            color: Color(0xFF98A2B3),
-                            fontSize: 11,
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'SkillSwap',
-                      style: TextStyle(
-                        color: Color(0xFF073A91),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                      const SizedBox(height: 22),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          onPressed: checking
+                              ? null
+                              : () async {
+                                  dialogSetState(() {
+                                    checking = true;
+                                    dialogError = null;
+                                  });
+
+                                  final isVerified =
+                                      await _checkVerification(user);
+
+                                  if (!dialogContext.mounted) return;
+
+                                  if (isVerified) {
+                                    Navigator.pop(dialogContext, true);
+                                  } else {
+                                    dialogSetState(() {
+                                      checking = false;
+                                      dialogError =
+                                          'Email is not verified yet. Open the verification link in your inbox first.';
+                                    });
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryBlue,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                          ),
+                          child: checking
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Verify Your Email',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    const Text(
-                      'Learn. Teach. Exchange.',
-                      style: TextStyle(
-                        color: Color(0xFF98A2B3),
-                        fontSize: 11,
+                      const SizedBox(height: 12),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _isResending,
+                        builder: (context, isResending, _) {
+                          return ValueListenableBuilder<int>(
+                            valueListenable: _resendSeconds,
+                            builder: (context, seconds, _) {
+                              return TextButton(
+                                onPressed: isResending || seconds > 0
+                                    ? null
+                                    : () async {
+                                        await _resendVerification(user);
+                                        if (dialogContext.mounted) {
+                                          dialogSetState(() {
+                                            dialogError = null;
+                                          });
+                                        }
+                                      },
+                                child: isResending
+                                    ? const SizedBox(
+                                        height: 18,
+                                        width: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text(
+                                        seconds > 0
+                                            ? 'Resend available in 00:${seconds.toString().padLeft(2, '0')}'
+                                            : 'Resend Verification Email',
+                                        style: TextStyle(
+                                          color: seconds > 0
+                                              ? Colors.grey
+                                              : primaryBlue,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                              );
+                            },
+                          );
+                        },
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 5),
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 15,
+                            color: Color(0xFF98A2B3),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'Resend available after 1 minute.',
+                            style: TextStyle(
+                              color: Color(0xFF98A2B3),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'SkillSwap',
+                        style: TextStyle(
+                          color: Color(0xFF073A91),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      const Text(
+                        'Learn. Teach. Exchange.',
+                        style: TextStyle(
+                          color: Color(0xFF98A2B3),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -291,11 +371,22 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     _resendTimer?.cancel();
+
+    if (verified == true && mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const MainNavigation(),
+        ),
+        (route) => false,
+      );
+    }
   }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
 
     try {
@@ -308,7 +399,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = credential.user;
 
       if (user == null) {
-        throw Exception('Could not sign in.');
+        throw Exception('Could not load account.');
       }
 
       await user.reload();
@@ -322,47 +413,25 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!refreshedUser.emailVerified) {
         if (!mounted) return;
 
+        setState(() => _isLoading = false);
         await _showVerificationDialog(refreshedUser);
         return;
       }
 
+      await refreshedUser.getIdToken(true);
+
       // AuthCheck in main.dart handles verified users.
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-
-      String message;
-
-      switch (e.code) {
-        case 'user-not-found':
-          message = 'No account found with this email.';
-          break;
-        case 'wrong-password':
-        case 'invalid-credential':
-          message = 'Incorrect email or password.';
-          break;
-        case 'invalid-email':
-          message = 'Please enter a valid email address.';
-          break;
-        case 'too-many-requests':
-          message = 'Too many attempts. Please try again later.';
-          break;
-        default:
-          message = e.message ?? 'Login failed. Please try again.';
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    } catch (_) {
+      _showMessage(_authError(e));
+    } catch (e) {
+      debugPrint('LOGIN ERROR: $e');
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Something went wrong. Please try again.'),
-        ),
-      );
+      _showMessage('Login failed: $e');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -373,11 +442,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (email.isEmpty ||
         !RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a valid email address first.'),
-        ),
-      );
+      _showMessage('Enter a valid email address first.');
       return;
     }
 
@@ -388,37 +453,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Password reset email sent. Please check your inbox.',
-          ),
-        ),
-      );
+      _showMessage('Password reset email sent. Check your inbox.');
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message ?? 'Could not send reset email.'),
-        ),
-      );
-    } catch (_) {
+      _showMessage('Password reset failed: ${_authError(e)}');
+    } catch (e) {
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not send reset email.'),
-        ),
-      );
+      _showMessage('Could not send reset email: $e');
     } finally {
-      if (mounted) setState(() => _isResettingPassword = false);
+      if (mounted) {
+        setState(() => _isResettingPassword = false);
+      }
     }
   }
 
   @override
   void dispose() {
     _resendTimer?.cancel();
+    _resendSeconds.dispose();
+    _isResending.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -476,6 +529,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    autofillHints: const [AutofillHints.email],
                     decoration: _inputDecoration(
                       hint: 'Enter your email',
                       icon: Icons.email_outlined,
@@ -505,6 +561,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
+                    autofillHints: const [AutofillHints.password],
                     decoration: _inputDecoration(
                       hint: 'Enter your password',
                       icon: Icons.lock_outline,
