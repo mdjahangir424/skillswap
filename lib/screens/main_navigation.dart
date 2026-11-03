@@ -18,33 +18,42 @@ class _MainNavigationState extends State<MainNavigation> {
 
   static const Color primaryBlue = Color(0xFF1558E8);
 
+  late final List<Widget> _screens;
+
   @override
-  Widget build(BuildContext context) {
-    final List<Widget> screens = [
+  void initState() {
+    super.initState();
+
+    _screens = [
       HomeScreen(
-        onNavigate: (index) {
-          setState(() {
-            selectedIndex = index;
-          });
-        },
+        onNavigate: _navigateTo,
       ),
       const ExploreScreen(),
       const MessagesScreen(),
       const ProfileScreen(),
     ];
+  }
 
+  void _navigateTo(int index) {
+    if (!mounted || index < 0 || index >= _screens.length) {
+      return;
+    }
+
+    setState(() {
+      selectedIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
         index: selectedIndex,
-        children: screens,
+        children: _screens,
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
-        onTap: (index) {
-          setState(() {
-            selectedIndex = index;
-          });
-        },
+        onTap: _navigateTo,
         type: BottomNavigationBarType.fixed,
         selectedItemColor: primaryBlue,
         unselectedItemColor: Colors.blueGrey,
