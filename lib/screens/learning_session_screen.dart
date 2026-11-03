@@ -24,247 +24,403 @@ class _LearningSessionScreenState
   bool _booking = false;
   bool _updating = false;
 
-  String get _uid => _auth.currentUser!.uid;
+  String get _uid => _auth.currentUser?.uid ?? '';
 
   void _message(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message)),
+      );
   }
 
   Future<Map<String, dynamic>?> _getUser(String uid) async {
-    final doc = await _db.collection('users').doc(uid).get();
-    return doc.data();
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      return doc.data();
+    } catch (_) {
+      return null;
+    }
   }
 
+  // BOOKING DIALOG
   Future<void> _openBookingDialog(
     String connectionId,
     List<String> participants,
     String partnerId,
     String partnerName,
   ) async {
+    if (_booking || !mounted) return;
+
+    final currentUser = _auth.currentUser;
+
+    if (currentUser == null) {
+      _message('Please log in again.');
+      return;
+    }
+
+    if (!currentUser.emailVerified) {
+      _message('Please verify your email first.');
+      return;
+    }
+
+    setState(() {
+      _booking = true;
+    });
+
     final skillController = TextEditingController();
+
     DateTime selectedDate = DateTime.now().add(
       const Duration(days: 1),
     );
+
     TimeOfDay selectedTime = const TimeOfDay(
       hour: 10,
       minute: 0,
     );
+
     int duration = 60;
+    bool isSubmitting = false;
 
-    await showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Book a Learning Session'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('With $partnerName'),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: skillController,
-                      decoration: const InputDecoration(
-                        labelText: 'What will you learn?',
-                        hintText: 'Example: Python Programming',
-                        border: OutlineInputBorder(),
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (dialogContext, setDialogState) {
+              return AlertDialog(
+                title: const Text('Book a Learning Session'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('With $partnerName'),
+                      const SizedBox(height: 16),
+
+                      TextField(
+                        controller: skillController,
+                        enabled: !isSubmitting,
+                        decoration: const InputDecoration(
+                          labelText: 'What will you learn?',
+                          hintText: 'Example: Python Programming',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.calendar_month,
-                        color: primaryBlue,
+
+                      const SizedBox(height: 14),
+
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.calendar_month,
+                          color: primaryBlue,
+                        ),
+                        title: const Text('Date'),
+                        subtitle: Text(
+                          '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                        ),
+                        onTap: isSubmitting
+                            ? null
+                            : () async {
+                                final picked = await showDatePicker(
+                                  context: dialogContext,
+                                  initialDate: selectedDate,
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 365),
+                                  ),
+                                );
+
+                                if (picked != null &&
+                                    dialogContext.mounted) {
+                                  setDialogState(() {
+                                    selectedDate = picked;
+                                  });
+                                }
+                              },
                       ),
-                      title: const Text('Date'),
-                      subtitle: Text(
-                        '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(
+                          Icons.access_time,
+                          color: primaryBlue,
+                        ),
+                        title: const Text('Time'),
+                        subtitle: Text(
+                          selectedTime.format(dialogContext),
+                        ),
+                        onTap: isSubmitting
+                            ? null
+                            : () async {
+                                final picked = await showTimePicker(
+                                  context: dialogContext,
+                                  initialTime: selectedTime,
+                                );
+
+                                if (picked != null &&
+                                    dialogContext.mounted) {
+                                  setDialogState(() {
+                                    selectedTime = picked;
+                                  });
+                                }
+                              },
                       ),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
+
+                      const SizedBox(height: 8),
+
+                      DropdownButtonFormField<int>(
+                        value: duration,
+                        decoration: const InputDecoration(
+                          labelText: 'Duration',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 30,
+                            child: Text('30 minutes'),
                           ),
-                        );
-                        if (picked != null) {
-                          setDialogState(() {
-                            selectedDate = picked;
-                          });
-                        }
-                      },
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.access_time,
-                        color: primaryBlue,
+                          DropdownMenuItem(
+                            value: 45,
+                            child: Text('45 minutes'),
+                          ),
+                          DropdownMenuItem(
+                            value: 60,
+                            child: Text('60 minutes'),
+                          ),
+                          DropdownMenuItem(
+                            value: 90,
+                            child: Text('90 minutes'),
+                          ),
+                          DropdownMenuItem(
+                            value: 120,
+                            child: Text('120 minutes'),
+                          ),
+                        ],
+                        onChanged: isSubmitting
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setDialogState(() {
+                                    duration = value;
+                                  });
+                                }
+                              },
                       ),
-                      title: const Text('Time'),
-                      subtitle: Text(selectedTime.format(context)),
-                      onTap: () async {
-                        final picked = await showTimePicker(
-                          context: context,
-                          initialTime: selectedTime,
-                        );
-                        if (picked != null) {
-                          setDialogState(() {
-                            selectedTime = picked;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<int>(
-                      value: duration,
-                      decoration: const InputDecoration(
-                        labelText: 'Duration',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 30,
-                          child: Text('30 minutes'),
-                        ),
-                        DropdownMenuItem(
-                          value: 45,
-                          child: Text('45 minutes'),
-                        ),
-                        DropdownMenuItem(
-                          value: 60,
-                          child: Text('60 minutes'),
-                        ),
-                        DropdownMenuItem(
-                          value: 90,
-                          child: Text('90 minutes'),
-                        ),
-                        DropdownMenuItem(
-                          value: 120,
-                          child: Text('120 minutes'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setDialogState(() {
-                            duration = value;
-                          });
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryBlue,
-                    foregroundColor: Colors.white,
+                    ],
                   ),
-                  onPressed: _booking
-                      ? null
-                      : () async {
-                          final skill = skillController.text.trim();
+                ),
 
-                          if (skill.isEmpty) {
-                            _message('Please enter a skill or topic.');
-                            return;
-                          }
+                actions: [
+                  TextButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () {
+                            Navigator.of(dialogContext).pop();
+                          },
+                    child: const Text('Cancel'),
+                  ),
 
-                          final scheduledAt = DateTime(
-                            selectedDate.year,
-                            selectedDate.month,
-                            selectedDate.day,
-                            selectedTime.hour,
-                            selectedTime.minute,
-                          );
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryBlue,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final skill =
+                                skillController.text.trim();
 
-                          if (!scheduledAt.isAfter(DateTime.now())) {
-                            _message('Choose a future date and time.');
-                            return;
-                          }
+                            if (skill.isEmpty) {
+                              _message(
+                                'Please enter a skill or topic.',
+                              );
+                              return;
+                            }
 
-                          setState(() => _booking = true);
+                            final scheduledAt = DateTime(
+                              selectedDate.year,
+                              selectedDate.month,
+                              selectedDate.day,
+                              selectedTime.hour,
+                              selectedTime.minute,
+                            );
 
-                          try {
-                            await _db
-                                .collection('learningSessions')
-                                .add({
-                              'requesterId': _uid,
-                              'receiverId': partnerId,
-                              'participants': participants,
-                              'connectionId': connectionId,
-                              'skill': skill,
-                              'scheduledAt': Timestamp.fromDate(
-                                scheduledAt,
-                              ),
-                              'durationMinutes': duration,
-                              'status': 'pending',
-                              'createdAt': FieldValue.serverTimestamp(),
-                              'updatedAt': FieldValue.serverTimestamp(),
+                            if (!scheduledAt.isAfter(
+                              DateTime.now(),
+                            )) {
+                              _message(
+                                'Choose a future date and time.',
+                              );
+                              return;
+                            }
+
+                            setDialogState(() {
+                              isSubmitting = true;
                             });
 
-                            if (dialogContext.mounted) {
-                              Navigator.pop(dialogContext);
-                            }
-                            _message('Session request sent!');
-                          } catch (e) {
-                            _message('Could not book session: $e');
-                          } finally {
-                            if (mounted) {
-                              setState(() => _booking = false);
-                            }
-                          }
-                        },
-                  child: _booking
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('Send Request'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
+                            try {
+                              final user = _auth.currentUser;
 
-    skillController.dispose();
+                              if (user == null) {
+                                throw Exception(
+                                  'Please log in again.',
+                                );
+                              }
+
+                              await user.reload();
+
+                              final refreshedUser =
+                                  _auth.currentUser;
+
+                              if (refreshedUser == null) {
+                                throw Exception(
+                                  'Your login session has expired.',
+                                );
+                              }
+
+                              if (!refreshedUser.emailVerified) {
+                                throw Exception(
+                                  'Please verify your email first.',
+                                );
+                              }
+
+                              // Refresh Firebase token claims.
+                              await refreshedUser.getIdToken(true);
+
+                              final validParticipants =
+                                  participants.toSet().toList();
+
+                              if (validParticipants.length != 2 ||
+                                  !validParticipants.contains(
+                                    refreshedUser.uid,
+                                  ) ||
+                                  !validParticipants.contains(
+                                    partnerId,
+                                  )) {
+                                throw Exception(
+                                  'Invalid connection participants.',
+                                );
+                              }
+
+                              if (connectionId.isEmpty ||
+                                  partnerId.isEmpty) {
+                                throw Exception(
+                                  'Invalid connection. Please try again.',
+                                );
+                              }
+
+                              await _db
+                                  .collection('learningSessions')
+                                  .add({
+                                'requesterId': refreshedUser.uid,
+                                'receiverId': partnerId,
+                                'participants': participants,
+                                'connectionId': connectionId,
+                                'skill': skill,
+                                'scheduledAt': Timestamp.fromDate(
+                                  scheduledAt,
+                                ),
+                                'durationMinutes': duration,
+                                'status': 'pending',
+                                'createdAt':
+                                    FieldValue.serverTimestamp(),
+                                'updatedAt':
+                                    FieldValue.serverTimestamp(),
+                              });
+
+                              if (!mounted ||
+                                  !dialogContext.mounted) {
+                                return;
+                              }
+
+                              Navigator.of(dialogContext).pop();
+
+                              _message(
+                                'Session request sent!',
+                              );
+                            } catch (e) {
+                              if (dialogContext.mounted) {
+                                setDialogState(() {
+                                  isSubmitting = false;
+                                });
+                              }
+
+                              _message(
+                                'Could not book session: $e',
+                              );
+                            }
+                          },
+                    child: isSubmitting
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Send Request'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      skillController.dispose();
+
+      if (mounted) {
+        setState(() {
+          _booking = false;
+        });
+      }
+    }
   }
 
+  // UPDATE SESSION STATUS
   Future<void> _updateStatus(
     String sessionId,
     String status,
   ) async {
-    if (_updating) return;
+    if (_updating || !mounted) return;
 
-    setState(() => _updating = true);
+    setState(() {
+      _updating = true;
+    });
 
     try {
+      final user = _auth.currentUser;
+
+      if (user == null) {
+        throw Exception('Please log in again.');
+      }
+
+      await user.reload();
+
+      final refreshedUser = _auth.currentUser;
+
+      if (refreshedUser == null ||
+          !refreshedUser.emailVerified) {
+        throw Exception('Please verify your email first.');
+      }
+
+      await refreshedUser.getIdToken(true);
+
       final update = <String, dynamic>{
         'status': status,
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
       if (status == 'completed') {
-        update['completedAt'] = FieldValue.serverTimestamp();
+        update['completedAt'] =
+            FieldValue.serverTimestamp();
       }
 
       await _db
@@ -283,17 +439,24 @@ class _LearningSessionScreenState
       _message('Could not update session: $e');
     } finally {
       if (mounted) {
-        setState(() => _updating = false);
+        setState(() {
+          _updating = false;
+        });
       }
     }
   }
 
+  // REVIEW DIALOG
   Future<void> _showReviewDialog(
     String sessionId,
     String revieweeId,
     String revieweeName,
   ) async {
+    if (!mounted) return;
+
     int rating = 5;
+    bool isSubmitting = false;
+
     final commentController = TextEditingController();
 
     final reviewRef = _db
@@ -305,36 +468,42 @@ class _LearningSessionScreenState
     try {
       final existing = await reviewRef.get();
 
+      if (!mounted) return;
+
       if (existing.exists) {
         _message('You have already reviewed this session.');
-        commentController.dispose();
         return;
       }
 
-      if (!mounted) return;
-
-      await showDialog(
+      await showDialog<void>(
         context: context,
+        barrierDismissible: false,
         builder: (dialogContext) {
           return StatefulBuilder(
-            builder: (context, setDialogState) {
+            builder: (dialogContext, setDialogState) {
               return AlertDialog(
                 title: Text('Review $revieweeName'),
                 content: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('How was your learning session?'),
+                      const Text(
+                        'How was your learning session?',
+                      ),
                       const SizedBox(height: 12),
+
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment:
+                            MainAxisAlignment.center,
                         children: List.generate(5, (index) {
                           return IconButton(
-                            onPressed: () {
-                              setDialogState(() {
-                                rating = index + 1;
-                              });
-                            },
+                            onPressed: isSubmitting
+                                ? null
+                                : () {
+                                    setDialogState(() {
+                                      rating = index + 1;
+                                    });
+                                  },
                             icon: Icon(
                               index < rating
                                   ? Icons.star
@@ -345,14 +514,18 @@ class _LearningSessionScreenState
                           );
                         }),
                       ),
+
                       Text('$rating out of 5 stars'),
                       const SizedBox(height: 12),
+
                       TextField(
                         controller: commentController,
+                        enabled: !isSubmitting,
                         maxLength: 500,
                         maxLines: 3,
                         decoration: const InputDecoration(
-                          hintText: 'Write your feedback (optional)',
+                          hintText:
+                              'Write your feedback (optional)',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -361,33 +534,91 @@ class _LearningSessionScreenState
                 ),
                 actions: [
                   TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
+                    onPressed: isSubmitting
+                        ? null
+                        : () {
+                            Navigator.of(dialogContext).pop();
+                          },
                     child: const Text('Cancel'),
                   ),
+
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryBlue,
                       foregroundColor: Colors.white,
                     ),
-                    onPressed: () async {
-                      try {
-                        await reviewRef.set({
-                          'reviewerId': _uid,
-                          'revieweeId': revieweeId,
-                          'rating': rating,
-                          'comment': commentController.text.trim(),
-                          'createdAt': FieldValue.serverTimestamp(),
-                        });
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            setDialogState(() {
+                              isSubmitting = true;
+                            });
 
-                        if (dialogContext.mounted) {
-                          Navigator.pop(dialogContext);
-                        }
-                        _message('Thank you for your review!');
-                      } catch (e) {
-                        _message('Could not submit review: $e');
-                      }
-                    },
-                    child: const Text('Submit Review'),
+                            try {
+                              final user = _auth.currentUser;
+
+                              if (user == null) {
+                                throw Exception(
+                                  'Please log in again.',
+                                );
+                              }
+
+                              await user.reload();
+
+                              final refreshedUser =
+                                  _auth.currentUser;
+
+                              if (refreshedUser == null ||
+                                  !refreshedUser.emailVerified) {
+                                throw Exception(
+                                  'Please verify your email first.',
+                                );
+                              }
+
+                              await refreshedUser.getIdToken(true);
+
+                              await reviewRef.set({
+                                'reviewerId': refreshedUser.uid,
+                                'revieweeId': revieweeId,
+                                'rating': rating,
+                                'comment':
+                                    commentController.text.trim(),
+                                'createdAt':
+                                    FieldValue.serverTimestamp(),
+                              });
+
+                              if (!mounted ||
+                                  !dialogContext.mounted) {
+                                return;
+                              }
+
+                              Navigator.of(dialogContext).pop();
+
+                              _message(
+                                'Thank you for your review!',
+                              );
+                            } catch (e) {
+                              if (dialogContext.mounted) {
+                                setDialogState(() {
+                                  isSubmitting = false;
+                                });
+                              }
+
+                              _message(
+                                'Could not submit review: $e',
+                              );
+                            }
+                          },
+                    child: isSubmitting
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Submit Review'),
                   ),
                 ],
               );
@@ -402,8 +633,10 @@ class _LearningSessionScreenState
     }
   }
 
+  // STATUS BADGE
   Widget _statusBadge(String status) {
     Color color;
+
     switch (status) {
       case 'accepted':
         color = Colors.blue;
@@ -438,11 +671,14 @@ class _LearningSessionScreenState
     );
   }
 
+  // SESSION CARD
   Widget _sessionCard(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {
     final data = doc.data();
+
     final status = (data['status'] ?? 'pending').toString();
+
     final participants = List<String>.from(
       data['participants'] ?? [],
     );
@@ -460,10 +696,14 @@ class _LearningSessionScreenState
         : null;
 
     return FutureBuilder<Map<String, dynamic>?>(
-      future: otherId.isEmpty ? Future.value(null) : _getUser(otherId),
+      future: otherId.isEmpty
+          ? Future.value(null)
+          : _getUser(otherId),
       builder: (context, userSnapshot) {
         final otherName =
-            (userSnapshot.data?['name'] ?? 'SkillSwap Partner').toString();
+            (userSnapshot.data?['name'] ??
+                    'SkillSwap Partner')
+                .toString();
 
         return Card(
           color: Colors.white,
@@ -484,19 +724,24 @@ class _LearningSessionScreenState
                       color: primaryBlue,
                     ),
                     const SizedBox(width: 8),
+
                     Expanded(
                       child: Text(
-                        (data['skill'] ?? 'Learning Session').toString(),
+                        (data['skill'] ?? 'Learning Session')
+                            .toString(),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
                       ),
                     ),
+
                     _statusBadge(status),
                   ],
                 ),
+
                 const SizedBox(height: 9),
+
                 Text(
                   'With $otherName',
                   style: const TextStyle(
@@ -504,8 +749,10 @@ class _LearningSessionScreenState
                     fontSize: 13,
                   ),
                 ),
+
                 if (scheduledAt != null) ...[
                   const SizedBox(height: 7),
+
                   Row(
                     children: [
                       const Icon(
@@ -514,25 +761,33 @@ class _LearningSessionScreenState
                         color: primaryBlue,
                       ),
                       const SizedBox(width: 5),
+
                       Text(
                         '${scheduledAt.day}/${scheduledAt.month}/${scheduledAt.year}',
                         style: const TextStyle(fontSize: 12),
                       ),
+
                       const SizedBox(width: 13),
+
                       const Icon(
                         Icons.access_time,
                         size: 16,
                         color: primaryBlue,
                       ),
                       const SizedBox(width: 5),
+
                       Text(
-                        TimeOfDay.fromDateTime(scheduledAt).format(context),
+                        TimeOfDay.fromDateTime(
+                          scheduledAt,
+                        ).format(context),
                         style: const TextStyle(fontSize: 12),
                       ),
                     ],
                   ),
                 ],
+
                 const SizedBox(height: 5),
+
                 Text(
                   '${data['durationMinutes'] ?? 60} minutes',
                   style: const TextStyle(
@@ -540,7 +795,9 @@ class _LearningSessionScreenState
                     color: Colors.grey,
                   ),
                 ),
+
                 const SizedBox(height: 11),
+
                 if (status == 'pending' && isReceiver)
                   Row(
                     children: [
@@ -548,11 +805,16 @@ class _LearningSessionScreenState
                         child: OutlinedButton(
                           onPressed: _updating
                               ? null
-                              : () => _updateStatus(doc.id, 'rejected'),
+                              : () => _updateStatus(
+                                    doc.id,
+                                    'rejected',
+                                  ),
                           child: const Text('Reject'),
                         ),
                       ),
+
                       const SizedBox(width: 9),
+
                       Expanded(
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
@@ -561,12 +823,16 @@ class _LearningSessionScreenState
                           ),
                           onPressed: _updating
                               ? null
-                              : () => _updateStatus(doc.id, 'accepted'),
+                              : () => _updateStatus(
+                                    doc.id,
+                                    'accepted',
+                                  ),
                           child: const Text('Accept'),
                         ),
                       ),
                     ],
                   ),
+
                 if (status == 'pending' && isRequester)
                   const Text(
                     'Waiting for your partner to respond.',
@@ -575,6 +841,7 @@ class _LearningSessionScreenState
                       color: Colors.orange,
                     ),
                   ),
+
                 if (status == 'accepted')
                   SizedBox(
                     width: double.infinity,
@@ -585,13 +852,22 @@ class _LearningSessionScreenState
                       ),
                       onPressed: _updating
                           ? null
-                          : () => _updateStatus(doc.id, 'completed'),
-                      icon: const Icon(Icons.check_circle_outline),
-                      label: const Text('Mark as Completed'),
+                          : () => _updateStatus(
+                                doc.id,
+                                'completed',
+                              ),
+                      icon: const Icon(
+                        Icons.check_circle_outline,
+                      ),
+                      label: const Text(
+                        'Mark as Completed',
+                      ),
                     ),
                   ),
+
                 if (status == 'completed')
-                  FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  FutureBuilder<
+                      DocumentSnapshot<Map<String, dynamic>>>(
                     future: _db
                         .collection('learningSessions')
                         .doc(doc.id)
@@ -617,7 +893,9 @@ class _LearningSessionScreenState
                             color: Color(0xFFFFB323),
                           ),
                           label: Text(
-                            reviewed ? 'Review Submitted' : 'Give Review',
+                            reviewed
+                                ? 'Review Submitted'
+                                : 'Give Review',
                           ),
                         ),
                       );
@@ -631,21 +909,30 @@ class _LearningSessionScreenState
     );
   }
 
+  // CONNECTIONS
   Widget _buildConnections() {
     return StreamBuilder<
         QuerySnapshot<Map<String, dynamic>>>(
       stream: _db
           .collection('connections')
-          .where('participants', arrayContains: _uid)
+          .where(
+            'participants',
+            arrayContains: _uid,
+          )
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Text('Could not load connections.');
+          return const Text(
+            'Could not load connections.',
+          );
         }
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState ==
+            ConnectionState.waiting) {
           return const Center(
-            child: CircularProgressIndicator(color: primaryBlue),
+            child: CircularProgressIndicator(
+              color: primaryBlue,
+            ),
           );
         }
 
@@ -655,7 +942,8 @@ class _LearningSessionScreenState
           return const Padding(
             padding: EdgeInsets.all(20),
             child: Text(
-              'You do not have any connections yet. Connect with someone in Explore first.',
+              'You do not have any connections yet. '
+              'Connect with someone in Explore first.',
               textAlign: TextAlign.center,
             ),
           );
@@ -680,7 +968,8 @@ class _LearningSessionScreenState
               future: _getUser(partnerId),
               builder: (context, userSnapshot) {
                 final partnerName =
-                    (userSnapshot.data?['name'] ?? 'SkillSwap Partner')
+                    (userSnapshot.data?['name'] ??
+                            'SkillSwap Partner')
                         .toString();
 
                 return Card(
@@ -688,19 +977,25 @@ class _LearningSessionScreenState
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: primaryBlue.withOpacity(0.10),
+                      backgroundColor:
+                          primaryBlue.withOpacity(0.10),
                       child: const Icon(
                         Icons.person,
                         color: primaryBlue,
                       ),
                     ),
+
                     title: Text(
                       partnerName,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    subtitle: const Text('Connected Skill Partner'),
+
+                    subtitle: const Text(
+                      'Connected Skill Partner',
+                    ),
+
                     trailing: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryBlue,
@@ -726,23 +1021,32 @@ class _LearningSessionScreenState
     );
   }
 
+  // SESSION LIST
   Widget _buildSessionList() {
     return StreamBuilder<
         QuerySnapshot<Map<String, dynamic>>>(
       stream: _db
           .collection('learningSessions')
-          .where('participants', arrayContains: _uid)
+          .where(
+            'participants',
+            arrayContains: _uid,
+          )
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(
-            child: Text('Could not load sessions: ${snapshot.error}'),
+            child: Text(
+              'Could not load sessions: ${snapshot.error}',
+            ),
           );
         }
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState ==
+            ConnectionState.waiting) {
           return const Center(
-            child: CircularProgressIndicator(color: primaryBlue),
+            child: CircularProgressIndicator(
+              color: primaryBlue,
+            ),
           );
         }
 
@@ -767,7 +1071,8 @@ class _LearningSessionScreenState
           return const Padding(
             padding: EdgeInsets.all(22),
             child: Text(
-              'No learning sessions yet. Book a session with a connection.',
+              'No learning sessions yet. '
+              'Book a session with a connection.',
               textAlign: TextAlign.center,
             ),
           );
@@ -800,7 +1105,9 @@ class _LearningSessionScreenState
           elevation: 0,
           title: const Text(
             'Learning Session',
-            style: TextStyle(fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           bottom: const TabBar(
             labelColor: primaryBlue,
@@ -818,6 +1125,7 @@ class _LearningSessionScreenState
             ],
           ),
         ),
+
         body: TabBarView(
           children: [
             RefreshIndicator(
@@ -825,7 +1133,10 @@ class _LearningSessionScreenState
               onRefresh: () async {
                 await _db
                     .collection('connections')
-                    .where('participants', arrayContains: _uid)
+                    .where(
+                      'participants',
+                      arrayContains: _uid,
+                    )
                     .get();
               },
               child: ListView(
@@ -838,22 +1149,32 @@ class _LearningSessionScreenState
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+
                   const SizedBox(height: 5),
+
                   const Text(
                     'Choose one of your connected skill partners.',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                      color: Colors.grey,
+                    ),
                   ),
+
                   const SizedBox(height: 13),
+
                   _buildConnections(),
                 ],
               ),
             ),
+
             RefreshIndicator(
               color: primaryBlue,
               onRefresh: () async {
                 await _db
                     .collection('learningSessions')
-                    .where('participants', arrayContains: _uid)
+                    .where(
+                      'participants',
+                      arrayContains: _uid,
+                    )
                     .get();
               },
               child: ListView(
@@ -866,7 +1187,9 @@ class _LearningSessionScreenState
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+
                   const SizedBox(height: 12),
+
                   _buildSessionList(),
                 ],
               ),
