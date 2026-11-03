@@ -1,9 +1,12 @@
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+
+import 'notifications_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -371,6 +374,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: const Text('Notifications'),
                 onTap: () {
                   Navigator.pop(sheetContext);
+
+                  if (!mounted) return;
+
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          const NotificationsScreen(),
+                    ),
+                  );
                 },
               ),
               ListTile(
