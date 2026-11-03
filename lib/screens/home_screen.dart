@@ -398,31 +398,72 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const Spacer(),
-                  Stack(
-                    children: [
-                      const Icon(
-                        Icons.notifications_none,
-                        size: 29,
-                      ),
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Text(
-                            '2',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                            ),
+
+                  // LIVE NOTIFICATION BUTTON
+                  StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: currentUser == null
+                        ? null
+                        : FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(currentUser!.uid)
+                            .collection('notifications')
+                            .where('isRead', isEqualTo: false)
+                            .limit(99)
+                            .snapshots(),
+                    builder: (context, snapshot) {
+                      final unreadCount =
+                          snapshot.data?.docs.length ?? 0;
+
+                      return InkWell(
+                        onTap: () => openScreen(
+                          const NotificationsScreen(),
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              const Icon(
+                                Icons.notifications_none,
+                                size: 29,
+                                color: Color(0xFF182230),
+                              ),
+                              if (unreadCount > 0)
+                                Positioned(
+                                  right: -5,
+                                  top: -5,
+                                  child: Container(
+                                    constraints: const BoxConstraints(
+                                      minWidth: 17,
+                                      minHeight: 17,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 2,
+                                    ),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      unreadCount > 99
+                                          ? '99+'
+                                          : unreadCount.toString(),
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ],
               ),
