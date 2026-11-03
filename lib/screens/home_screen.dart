@@ -1,5 +1,7 @@
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'achievements_screen.dart';
 import 'learning_session_screen.dart';
@@ -20,6 +22,8 @@ class _HomeScreenState extends State<HomeScreen> {
   static const blue = Color(0xFF1558E8);
   static const purple = Color(0xFF6035D9);
 
+  User? get currentUser => FirebaseAuth.instance.currentUser;
+
   void openScreen(Widget screen) {
     Navigator.push(
       context,
@@ -27,10 +31,339 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _navigateFromDrawer(int index) {
+    Navigator.pop(context);
+    widget.onNavigate(index);
+  }
+
+  void _openDrawerScreen(Widget screen) {
+    Navigator.pop(context);
+    openScreen(screen);
+  }
+
+  Future<void> _logout() async {
+    Navigator.pop(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log Out?'),
+        content: const Text(
+          'Are you sure you want to log out of SkillSwap?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Log Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not log out: $e')),
+      );
+    }
+  }
+
+  void _showInformation(String title, String message) {
+    Navigator.pop(context);
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawer() {
+    final user = currentUser;
+
+    return Drawer(
+      width: 300,
+      backgroundColor: Colors.white,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.swap_horiz_rounded,
+                          color: purple,
+                          size: 34,
+                        ),
+                        const SizedBox(width: 8),
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'SkillSwap',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF253A8B),
+                              ),
+                            ),
+                            Text(
+                              'Learn. Teach. Exchange.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.blueGrey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Divider(height: 1),
+
+                  if (user != null)
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(user.uid)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final data = snapshot.data?.data() ?? {};
+
+                        final name =
+                            (data['name'] as String?) ??
+                            user.displayName ??
+                            'SkillSwap User';
+
+                        final email =
+                            (data['email'] as String?) ??
+                            user.email ??
+                            '';
+
+                        final photoUrl =
+                            (data['photoUrl'] as String?) ?? '';
+
+                        return InkWell(
+                          onTap: () => _navigateFromDrawer(3),
+                          child: Padding(
+                            padding: const EdgeInsets.all(18),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 27,
+                                  backgroundColor:
+                                      const Color(0xFFE5ECFA),
+                                  backgroundImage: photoUrl.isNotEmpty
+                                      ? NetworkImage(photoUrl)
+                                      : null,
+                                  child: photoUrl.isEmpty
+                                      ? const Icon(
+                                          Icons.person,
+                                          color: blue,
+                                          size: 30,
+                                        )
+                                      : null,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF182230),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        email,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.blueGrey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 15,
+                                  color: Colors.grey,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+
+                  const Divider(height: 1),
+
+                  _drawerItem(
+                    Icons.home_outlined,
+                    'Home',
+                    onTap: () => _navigateFromDrawer(0),
+                  ),
+                  _drawerItem(
+                    Icons.person_outline,
+                    'My Profile',
+                    onTap: () => _navigateFromDrawer(3),
+                  ),
+                  _drawerItem(
+                    Icons.school_outlined,
+                    'My Skills',
+                    onTap: () => _navigateFromDrawer(3),
+                  ),
+                  _drawerItem(
+                    Icons.people_outline,
+                    'My Connections',
+                    onTap: () => _openDrawerScreen(
+                      const LearningSessionScreen(),
+                    ),
+                  ),
+                  _drawerItem(
+                    Icons.calendar_month_outlined,
+                    'My Sessions',
+                    onTap: () => _openDrawerScreen(
+                      const LearningSessionScreen(),
+                    ),
+                  ),
+                  _drawerItem(
+                    Icons.notifications_none,
+                    'Notifications',
+                    onTap: () => _showInformation(
+                      'Notifications',
+                      'Your notifications feature will be available in a future update.',
+                    ),
+                  ),
+                  _drawerItem(
+                    Icons.emoji_events_outlined,
+                    'Achievements',
+                    onTap: () => _openDrawerScreen(
+                      const AchievementsScreen(),
+                    ),
+                  ),
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 18),
+                    child: Divider(height: 20),
+                  ),
+
+                  _drawerItem(
+                    Icons.settings_outlined,
+                    'Settings',
+                    onTap: () => _showInformation(
+                      'Settings',
+                      'Settings options will be added in a future update.',
+                    ),
+                  ),
+                  _drawerItem(
+                    Icons.help_outline,
+                    'Help & Support',
+                    onTap: () => _showInformation(
+                      'Help & Support',
+                      'SkillSwap support information will be added soon.',
+                    ),
+                  ),
+                  _drawerItem(
+                    Icons.info_outline,
+                    'About SkillSwap',
+                    onTap: () => _showInformation(
+                      'About SkillSwap',
+                      'SkillSwap — Learn. Teach. Exchange.',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 1),
+
+            _drawerItem(
+              Icons.logout,
+              'Logout',
+              color: Colors.red,
+              onTap: _logout,
+            ),
+
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12, top: 2),
+              child: Text(
+                'SkillSwap • Version 1.0.0',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _drawerItem(
+    IconData icon,
+    String title, {
+    required VoidCallback onTap,
+    Color color = const Color(0xFF344054),
+  }) {
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 22),
+      leading: Icon(icon, size: 22, color: color),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: color,
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),
+      drawer: _buildDrawer(),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
@@ -40,8 +373,18 @@ class _HomeScreenState extends State<HomeScreen> {
               // Header
               Row(
                 children: [
-                  const Icon(Icons.menu, size: 28),
-                  const SizedBox(width: 18),
+                  Builder(
+                    builder: (context) => IconButton(
+                      onPressed: () => Scaffold.of(context).openDrawer(),
+                      icon: const Icon(Icons.menu, size: 28),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 40,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   const Icon(
                     Icons.swap_horiz_rounded,
                     color: purple,
@@ -58,7 +401,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Spacer(),
                   Stack(
                     children: [
-                      const Icon(Icons.notifications_none, size: 29),
+                      const Icon(
+                        Icons.notifications_none,
+                        size: 29,
+                      ),
                       Positioned(
                         right: 0,
                         top: 0,
@@ -149,7 +495,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         SizedBox(width: 12),
                         Expanded(
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'Your Skill Level',
@@ -174,7 +521,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 20),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment:
+                          MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
                           'Learning Progress',
@@ -239,7 +587,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Session',
                     const Color(0xFFFFF0E5),
                     const Color(0xFFFF8A24),
-                    () => openScreen(const LearningSessionScreen()),
+                    () => openScreen(
+                      const LearningSessionScreen(),
+                    ),
                   ),
                   _actionCard(
                     Icons.emoji_events,
@@ -247,7 +597,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     'Achievements',
                     const Color(0xFFE8EEFF),
                     blue,
-                    () => openScreen(const AchievementsScreen()),
+                    () => openScreen(
+                      const AchievementsScreen(),
+                    ),
                   ),
                 ],
               ),
@@ -321,11 +673,15 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 10),
             Text(
               first,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
             ),
             Text(
               second,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
