@@ -1,10 +1,10 @@
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'achievements_screen.dart';
 import 'learning_session_screen.dart';
+import 'notifications_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ValueChanged<int> onNavigate;
@@ -266,9 +266,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   _drawerItem(
                     Icons.notifications_none,
                     'Notifications',
-                    onTap: () => _showInformation(
-                      'Notifications',
-                      'Your notifications feature will be available in a future update.',
+                    onTap: () => _openDrawerScreen(
+                      const NotificationsScreen(),
                     ),
                   ),
                   _drawerItem(
