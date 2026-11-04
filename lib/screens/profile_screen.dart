@@ -21,7 +21,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isUploadingPhoto = false;
+
   final Set<String> _skillOperations = <String>{};
+  final Set<String> _addingSkillFields = <String>{};
 
   User? get currentUser => FirebaseAuth.instance.currentUser;
 
@@ -130,12 +132,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Normalize skill names and remove extra spaces.
   String _normalizeSkill(String value) {
     return value.trim().replaceAll(RegExp(r'\s+'), ' ');
   }
 
+  // Read only valid string values from Firestore.
+  List<String> _readSkills(dynamic value) {
+    if (value is! List) return <String>[];
+
+    return value
+        .whereType<String>()
+        .map(_normalizeSkill)
+        .where((skill) => skill.isNotEmpty)
+        .toList();
+  }
+
   String _skillOperationKey(String fieldName, String skill) {
     return '$fieldName::${skill.toLowerCase()}';
+  }
+
+  String _addOperationKey(String fieldName) {
+    return '$fieldName::__add__';
+  }
+
+  bool _containsSkill(List<String> items, String skill) {
+    final normalizedSkill = _normalizeSkill(skill).toLowerCase();
+
+    return items.any(
+      (item) => _normalizeSkill(item).toLowerCase() ==
+          normalizedSkill,
+    );
   }
 
   Future<void> showEditDialog(
@@ -144,6 +171,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     String fieldName,
   ) async {
     if (currentUser == null) return;
+
+    if (_addingSkillFields.contains(fieldName)) return;
 
     final newValue = await showDialog<String>(
       context: context,
@@ -156,7 +185,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted || newValue == null) return;
 
     final normalizedValue = _normalizeSkill(newValue);
-    if (normalizedValue.length < 2 || normalizedValue.length > 40) {
+
+    if (normalizedValue.length < 2 ||
+        normalizedValue.length > 40) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Skill name must be 2–40 characters.'),
@@ -165,11 +196,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final duplicate = items.any(
-      (item) => _normalizeSkill(item).toLowerCase() ==
-          normalizedValue.toLowerCase(),
-    );
-    if (duplicate) {
+    // Check duplicates again before saving.
+    if (_containsSkill(items, normalizedValue)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('This skill is already in your list.'),
@@ -178,10 +206,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    final operationKey = _skillOperationKey(fieldName, normalizedValue);
+    final operationKey =
+        _skillOperationKey(fieldName, normalizedValue);
+
     if (_skillOperations.contains(operationKey)) return;
 
-    setState(() => _skillOperations.add(operationKey));
+    setState(() {
+      _addingSkillFields.add(fieldName);
+      _skillOperations.add(operationKey);
+    });
 
     try {
       await _userDocument.set({
@@ -190,29 +223,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }, SetOptions(merge: true));
 
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Successfully added!')),
+        const SnackBar(
+          content: Text('Successfully added!'),
+        ),
       );
     } on FirebaseException catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Firebase error: ${e.message ?? e.code}')),
+        SnackBar(
+          content: Text('Firebase error: ${e.message ?? e.code}'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save: $e')),
+        SnackBar(
+          content: Text('Could not save: $e'),
+        ),
       );
     } finally {
-      if (mounted) setState(() => _skillOperations.remove(operationKey));
+      if (mounted) {
+        setState(() {
+          _addingSkillFields.remove(fieldName);
+          _skillOperations.remove(operationKey);
+        });
+      }
     }
   }
 
-  Future<void> _deleteSkill(String item, bool isLearning) async {
+  Future<void> _deleteSkill(
+    String item,
+    bool isLearning,
+  ) async {
     if (currentUser == null) return;
 
-    final fieldName = isLearning ? 'skillsWanted' : 'skillsOffered';
+    final fieldName =
+        isLearning ? 'skillsWanted' : 'skillsOffered';
+
     final operationKey = _skillOperationKey(fieldName, item);
+
     if (_skillOperations.contains(operationKey)) return;
 
     final confirmed = await showDialog<bool>(
@@ -239,7 +292,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    setState(() => _skillOperations.add(operationKey));
+    setState(() {
+      _skillOperations.add(operationKey);
+    });
+
     try {
       await _userDocument.set({
         fieldName: FieldValue.arrayRemove([item]),
@@ -247,21 +303,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }, SetOptions(merge: true));
 
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Skill deleted successfully!')),
+        const SnackBar(
+          content: Text('Skill deleted successfully!'),
+        ),
       );
     } on FirebaseException catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Firebase error: ${e.message ?? e.code}')),
+        SnackBar(
+          content: Text('Firebase error: ${e.message ?? e.code}'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete skill: $e')),
+        SnackBar(
+          content: Text('Could not delete skill: $e'),
+        ),
       );
     } finally {
-      if (mounted) setState(() => _skillOperations.remove(operationKey));
+      if (mounted) {
+        setState(() {
+          _skillOperations.remove(operationKey);
+        });
+      }
     }
   }
 
@@ -423,6 +492,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         }
 
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  'Could not load profile: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          );
+        }
+
         final data = snapshot.data?.data() ?? <String, dynamic>{};
 
         final String name =
@@ -447,10 +530,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             (data['countryCode'] as String?) ?? '';
 
         final List<String> skillsOffered =
-            List<String>.from(data['skillsOffered'] ?? const []);
+            _readSkills(data['skillsOffered']);
 
         final List<String> skillsWanted =
-            List<String>.from(data['skillsWanted'] ?? const []);
+            _readSkills(data['skillsWanted']);
 
         return Scaffold(
           backgroundColor: const Color(0xFFF7F8FC),
@@ -765,6 +848,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required bool isLearning,
     required VoidCallback onAdd,
   }) {
+    final bool isAdding =
+        _addingSkillFields.contains(fieldName);
+
     return _whiteCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -781,9 +867,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               TextButton.icon(
-                onPressed: onAdd,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add'),
+                onPressed: isAdding ? null : onAdd,
+                icon: isAdding
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.add, size: 18),
+                label: Text(isAdding ? 'Saving...' : 'Add'),
                 style: TextButton.styleFrom(
                   foregroundColor: primaryBlue,
                 ),
@@ -793,7 +887,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 10),
           if (skills.isEmpty)
             Text(
-              'No skills added yet.',
+              isLearning
+                  ? 'No learning goals added yet.'
+                  : 'No teaching skills added yet.',
               style: TextStyle(
                 color: Colors.grey.shade600,
               ),
@@ -805,6 +901,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               children: skills.map((skill) {
                 final operationKey =
                     _skillOperationKey(fieldName, skill);
+
                 final isBusy =
                     _skillOperations.contains(operationKey);
 
