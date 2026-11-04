@@ -83,6 +83,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      await currentUser!.updatePhotoURL(downloadUrl);
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -457,6 +459,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final String countryCode =
             (data['countryCode'] as String?) ?? '';
 
+        final String country =
+            (data['country'] as String?) ?? countryCode;
+
         final List<String> skillsOffered =
             List<String>.from(data['skillsOffered'] ?? []);
 
@@ -499,6 +504,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   photoUrl: photoUrl,
                   location: location,
                   countryCode: countryCode,
+                  country: country,
                 ),
                 const SizedBox(height: 24),
                 _buildSectionTitle(
@@ -569,6 +575,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String photoUrl,
     required String location,
     required String countryCode,
+    required String country,
   }) {
     return Container(
       width: double.infinity,
@@ -649,29 +656,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: Colors.grey,
             ),
           ),
-          if (location.isNotEmpty) ...[
+          if (country.isNotEmpty || location.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.location_on_outlined,
-                  size: 17,
-                  color: Colors.grey,
-                ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    '${_countryFlag(countryCode)} $location',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 13,
+            if (country.isNotEmpty)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(_countryFlag(countryCode)),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      country,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFF626B7A),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            if (location.isNotEmpty) ...[
+              const SizedBox(height: 5),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.location_on_outlined,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      location,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
           if (bio.isNotEmpty) ...[
             const SizedBox(height: 14),
@@ -685,6 +714,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 18),
+          _buildProfileStatistics(),
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
@@ -700,6 +731,110 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileStatistics() {
+    final uid = currentUser!.uid;
+
+    return Row(
+      children: [
+        Expanded(
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('connections')
+                .where('participants', arrayContains: uid)
+                .snapshots(),
+            builder: (context, snapshot) {
+              final value = snapshot.hasError
+                  ? '—'
+                  : snapshot.connectionState == ConnectionState.waiting
+                      ? '…'
+                      : (snapshot.data?.docs.length ?? 0).toString();
+              return _buildStatCard(
+                icon: Icons.people_alt_rounded,
+                value: value,
+                label: 'Connections',
+                iconColor: const Color(0xFF1687F8),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collectionGroup('reviews')
+                .where('revieweeId', isEqualTo: uid)
+                .snapshots(),
+            builder: (context, snapshot) {
+              String value = '—';
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                value = '…';
+              } else if (!snapshot.hasError) {
+                final reviews = snapshot.data?.docs ?? [];
+                final ratings = reviews
+                    .map((doc) => doc.data()['rating'])
+                    .whereType<num>()
+                    .toList();
+                if (ratings.isNotEmpty) {
+                  final average = ratings.fold<double>(
+                        0,
+                        (total, rating) => total + rating.toDouble(),
+                      ) /
+                      ratings.length;
+                  value = average.toStringAsFixed(1);
+                } else {
+                  value = '—';
+                }
+              }
+              return _buildStatCard(
+                icon: Icons.star_rounded,
+                value: value,
+                label: 'Rating',
+                iconColor: const Color(0xFFFFB323),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color iconColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F4FC),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: iconColor, size: 23),
+          const SizedBox(height: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFF1D2433),
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF626B7A),
+              fontSize: 12,
             ),
           ),
         ],
