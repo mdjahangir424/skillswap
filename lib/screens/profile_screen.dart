@@ -748,7 +748,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               label: const Text('Edit Profile'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: primaryBlue,
-                side: const BorderSide(color: primaryBlue),
+                side: BorderSide(color: primaryBlue),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
