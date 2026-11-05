@@ -470,129 +470,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 24),
 
-              // Welcome
-              Row(
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hello, Rafiq! 👋',
-                          style: TextStyle(
-                            fontSize: 23,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          "Let's grow together!",
-                          style: TextStyle(fontSize: 15),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const CircleAvatar(
-                    radius: 27,
-                    backgroundColor: Color(0xFFDCE7F8),
-                    child: Icon(
-                      Icons.person,
-                      color: blue,
-                      size: 32,
-                    ),
-                  ),
-                ],
-              ),
+              // Welcome: live name and profile photo from Firebase
+              _buildWelcomeHeader(),
 
               const SizedBox(height: 22),
 
-              // Skill progress card
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(22),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF4628D8),
-                      Color(0xFF087CCB),
-                      Color(0xFF11BDA9),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: blue.withOpacity(0.18),
-                      blurRadius: 14,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Text('⭐', style: TextStyle(fontSize: 28)),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Your Skill Level',
-                                style: TextStyle(color: Colors.white),
-                              ),
-                              Text(
-                                'Intermediate',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.arrow_forward,
-                          color: Colors.white,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Learning Progress',
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        Text(
-                          '68%',
-                          style: TextStyle(
-                            color: Colors.yellow.shade300,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 17,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: const LinearProgressIndicator(
-                        value: 0.68,
-                        minHeight: 10,
-                        backgroundColor: Colors.white30,
-                        valueColor: AlwaysStoppedAnimation(
-                          Color(0xFF20D5ED),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // Skill level and combined learning progress from Firebase
+              _buildLearningProgressCard(),
 
               const SizedBox(height: 20),
 
@@ -688,6 +572,403 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildWelcomeHeader() {
+    final user = currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() ?? {};
+        final name = (data['name'] as String?)?.trim().isNotEmpty == true
+            ? (data['name'] as String).trim()
+            : (user.displayName?.trim().isNotEmpty == true
+                ? user.displayName!.trim()
+                : 'SkillSwap User');
+        final photoUrl = (data['photoUrl'] as String?)?.trim().isNotEmpty == true
+            ? (data['photoUrl'] as String).trim()
+            : (user.photoURL ?? '');
+
+        return Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hello, $name! 👋',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    "Let's grow together!",
+                    style: TextStyle(fontSize: 15),
+                  ),
+                ],
+              ),
+            ),
+            CircleAvatar(
+              radius: 27,
+              backgroundColor: const Color(0xFFDCE7F8),
+              backgroundImage: photoUrl.isNotEmpty
+                  ? NetworkImage(photoUrl)
+                  : null,
+              child: photoUrl.isEmpty
+                  ? const Icon(Icons.person, color: blue, size: 32)
+                  : null,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _manageLearningGoals() async {
+    final user = currentUser;
+    if (user == null) return;
+
+    final userRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid);
+
+    try {
+      final snapshot = await userRef.get();
+      final data = snapshot.data() ?? <String, dynamic>{};
+      final goals = (data['skillsWanted'] as List?)
+              ?.whereType<String>()
+              .map((item) => item.trim())
+              .where((item) => item.isNotEmpty)
+              .toSet()
+              .toList() ??
+          <String>[];
+      final completed = (data['completedSkills'] as List?)
+              ?.whereType<String>()
+              .toSet() ??
+          <String>{};
+
+      if (!mounted) return;
+
+      if (goals.isEmpty) {
+        showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Learning Goals'),
+            content: const Text(
+              'You have not added any learning goals yet. Add skills you want to learn in your Profile first.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  widget.onNavigate(3);
+                },
+                child: const Text('Open Profile'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          final selected = <String>{
+            ...completed.where((goal) => goals.contains(goal)),
+          };
+          bool saving = false;
+          String? error;
+
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              Future<void> toggleGoal(String goal, bool isDone) async {
+                if (saving) return;
+                setDialogState(() {
+                  saving = true;
+                  error = null;
+                });
+
+                try {
+                  await userRef.set({
+                    'completedSkills': isDone
+                        ? FieldValue.arrayUnion([goal])
+                        : FieldValue.arrayRemove([goal]),
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
+
+                  setDialogState(() {
+                    if (isDone) {
+                      selected.add(goal);
+                    } else {
+                      selected.remove(goal);
+                    }
+                  });
+                } catch (e) {
+                  setDialogState(() {
+                    error = 'Could not update goal: $e';
+                  });
+                } finally {
+                  setDialogState(() {
+                    saving = false;
+                  });
+                }
+              }
+
+              return AlertDialog(
+                title: const Text('My Learning Goals'),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Check a goal when you have completed learning it. Your Home progress updates automatically.',
+                        style: TextStyle(fontSize: 13, height: 1.4),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: (goals.length * 56.0).clamp(56.0, 280.0),
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: goals.map((goal) {
+                            return CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              activeColor: blue,
+                              title: Text(goal),
+                              value: selected.contains(goal),
+                              onChanged: saving
+                                  ? null
+                                  : (value) => toggleGoal(
+                                        goal,
+                                        value ?? false,
+                                      ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      if (saving) ...[
+                        const SizedBox(height: 8),
+                        const LinearProgressIndicator(minHeight: 3),
+                      ],
+                      if (error != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          error!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${selected.length} of ${goals.length} goals completed',
+                          style: const TextStyle(
+                            color: blue,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: saving
+                        ? null
+                        : () => Navigator.pop(dialogContext),
+                    child: const Text('Done'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load learning goals: $e')),
+      );
+    }
+  }
+
+  Widget _buildLearningProgressCard() {
+    final user = currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    final userRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid);
+    final sessionsQuery = FirebaseFirestore.instance
+        .collection('learningSessions')
+        .where('participants', arrayContains: user.uid);
+
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: userRef.snapshots(),
+      builder: (context, userSnapshot) {
+        final userData = userSnapshot.data?.data() ?? {};
+        final wantedSkills = (userData['skillsWanted'] as List?)
+                ?.whereType<String>()
+                .toSet() ??
+            <String>{};
+        final completedSkills = (userData['completedSkills'] as List?)
+                ?.whereType<String>()
+                .toSet() ??
+            <String>{};
+        final completedGoalCount = wantedSkills.intersection(completedSkills).length;
+
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: sessionsQuery.snapshots(),
+          builder: (context, sessionSnapshot) {
+            final sessionDocs = sessionSnapshot.data?.docs ?? [];
+            var eligibleSessionCount = 0;
+            var completedSessionCount = 0;
+
+            for (final doc in sessionDocs) {
+              final status = (doc.data()['status'] ?? 'pending')
+                  .toString()
+                  .toLowerCase();
+              if (status == 'accepted' || status == 'completed') {
+                eligibleSessionCount++;
+              }
+              if (status == 'completed') {
+                completedSessionCount++;
+              }
+            }
+
+            final totalUnits = eligibleSessionCount + wantedSkills.length;
+            final completedUnits = completedSessionCount + completedGoalCount;
+            final progress = totalUnits == 0
+                ? 0.0
+                : (completedUnits / totalUnits).clamp(0.0, 1.0).toDouble();
+            final percentage = (progress * 100).round();
+            final skillLevel = percentage >= 90
+                ? 'Expert'
+                : percentage >= 70
+                    ? 'Advanced'
+                    : percentage >= 30
+                        ? 'Intermediate'
+                        : 'Beginner';
+
+            return InkWell(
+              onTap: _manageLearningGoals,
+              borderRadius: BorderRadius.circular(22),
+              child: Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(22),
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF4628D8),
+                      Color(0xFF087CCB),
+                      Color(0xFF11BDA9),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: blue.withOpacity(0.18),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('⭐', style: TextStyle(fontSize: 28)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Your Skill Level',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              Text(
+                                skillLevel,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward, color: Colors.white),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Learning Progress',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        Text(
+                          '$percentage%',
+                          style: TextStyle(
+                            color: Colors.yellow.shade300,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 17,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 10,
+                        backgroundColor: Colors.white30,
+                        valueColor: const AlwaysStoppedAnimation(
+                          Color(0xFF20D5ED),
+                        ),
+                      ),
+                    ),
+                    if (sessionSnapshot.hasError ||
+                        userSnapshot.hasError) ...[
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Could not refresh progress data.',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
